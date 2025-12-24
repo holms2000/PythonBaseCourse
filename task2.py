@@ -1,6 +1,13 @@
-#файл с первым заданием
+"""file task two"""
 import math
 def input_info():
+    '''
+    @requires: None
+    @modifies: None
+    @effects: None
+    @raises: None
+    @returns: receiving data from the input console
+    '''
     d1 = int(input('Введите кратчайшее расстояние от спасателя до кромки воды, d1 (ярды) => '))
     d2 = int(input('Введите кратчайшее расстояние от утопающего до берега, d2 (футы) => '))
     h = int(input('Введите боковое смещение между спасателем и утопающим, h (ярды) => '))
@@ -10,6 +17,13 @@ def input_info():
     return d1,d2,h,v_sand,n,theta1
 
 def func_find(d1,d2,h,v_sand,n,theta1): 
+    '''
+    @requires: d1, d2, h, v_sand, n b ϵ[1,1000]; theta1 ϵ[1.000,180.000]
+    @modifies: None
+    @effects: None
+    @raises: None
+    @returns: the number of seconds it takes for a rescuer to reach a drowning person
+    '''
     #в одном ярде 3 фута
     d1=d1*3
     #в одном ярде 3 фута
@@ -30,8 +44,34 @@ def func_find(d1,d2,h,v_sand,n,theta1):
     return t
 
 def output_info(theta1,t):
+    '''
+    @requires: t ϵ[1,1000]; theta1 ϵ[1.000,180.000]
+    @modifies: None
+    @effects: None
+    @raises: None
+    @returns: displays the values ​​of variables in the console
+    '''
     print(f'Если спасатель начнет движение под углом theta1, равным {theta1:.1f} градусам, он достигнет утопающего через {t:.1f} секунды')
 
-d1,d2,h,v_sand,n,theta1 = input_info()
-t = func_find(d1,d2,h,v_sand,n,theta1)
-output_info(theta1,t)
+#d1,d2,h,v_sand,n,theta1 = input_info()
+#t = func_find(d1,d2,h,v_sand,n,theta1)
+#output_info(theta1,t)
+def test_time_save():
+    total = 4
+    passed = 0
+    inputs =((8,10,50,5,2,39.413),(8,10,50,5,2,39.413),(8,10,50,5,2,39.413),(8,10,50,5,2,39.413)) 
+    expected = (39.9,39.9,39.9,39.9)
+    epsilon = 1.0e-1
+    for i in range(len(inputs)):
+        inp=inputs[i]
+        t = func_find(inp[0],inp[1],inp[2],inp[3],inp[4],inp[5])
+        if abs(t - expected[i]) > epsilon:
+            print('Test failed')
+        else:
+            print('Test passed')
+            passed +=1
+    return total,passed
+
+total,passed=test_time_save()
+print(f'Total {total} tests run and {passed} of them passed.')
+
