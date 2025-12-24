@@ -59,12 +59,13 @@ def output_info(theta1,t):
 def test_time_save():
     total = 4
     passed = 0
-    inputs =((8,10,50,5,2,39.413),(8,10,50,5,2,39.413),(8,10,50,5,2,39.413),(8,10,50,5,2,39.413)) 
-    expected = (39.9,39.9,39.9,39.9)
+    inputs =((8,10,50,5,2,25.413),(8,10,50,5,2,55.413),(8,10,50,5,2,77.413),(8,10,50,5,2,39.413)) 
+    expected = (41.5,37.29,26.92,39.9)
     epsilon = 1.0e-1
     for i in range(len(inputs)):
         inp=inputs[i]
         t = func_find(inp[0],inp[1],inp[2],inp[3],inp[4],inp[5])
+        print(t)
         if abs(t - expected[i]) > epsilon:
             print('Test failed')
         else:
