@@ -1,4 +1,4 @@
-"""file task two"""
+"""file task three"""
 import math
 def input_info():
     '''
