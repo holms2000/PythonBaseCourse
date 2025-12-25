@@ -99,7 +99,15 @@ def output_info(theta1,t):
 #d1,d2,h,v_sand,n,theta1 = input_info()
 #t = func_find(d1,d2,h,v_sand,n,theta1)
 #output_info(theta1,t)
+
 def test_time_save():
+    '''
+    @requires: None
+    @modifies: None
+    @effects: None
+    @raises: None
+    @returns: test def func_find
+    '''
     total = 4
     passed = 0
     inputs =((8,10,50,5,2,25.413),(8,10,50,5,2,55.413),(8,10,50,5,2,77.413),(8,10,50,5,2,39.413)) 
@@ -117,6 +125,52 @@ def test_time_save():
             #output_info(inp[5],t)
     return total,passed
 
+def test_x_L1_L2():
+    '''
+    @requires: None
+    @modifies: None
+    @effects: None
+    @raises: None
+    @returns: test functions find_x, find_L1, find_L2
+    '''
+    
+    #в одном ярде 3 фута
+    d1=8*3
+    
+    d2 = 10
+    #в одном ярде 3 фута
+    h = 50*3
+    #в одной миле 5280 футов - 1 час это 60 * 60 секунд
+    
+    v_sand = 5*5280/(60**2)
+    n =2 
+    theta1 = 39.413
+
+    x = find_x(d1,theta1)
+    expected = 19.72
+    epsilon = 1.0e-1
+    if abs(x - expected) > epsilon:
+        print('Test failed x')
+    else:
+        print('Test passed x')
+    expected = 31.06
+    L1 = find_L1(x,d1)
+    if abs(L1 - expected) > epsilon:
+        print('Test failed L1')
+    else:
+        print('Test passed L1')
+    L2 = find_L2(h,x,d2) 
+    expected = 130.66
+    epsilon = 1.0e-1
+    if abs(L2 - expected) > epsilon:
+        print('Test failed L2')
+    else:
+        print('Test passed L2')
+    expected = 31.06
+
+    print(find_t(L1,n,L2,v_sand))
+
 total,passed=test_time_save()
 print(f'Total {total} tests run and {passed} of them passed.')
 
+test_x_L1_L2()
