@@ -16,6 +16,51 @@ def input_info():
     theta1 = float(input('Введите направление движения спасателя по песку, theta1 (градусы) => '))
     return d1,d2,h,v_sand,n,theta1
 
+def find_x(d1,theta1):
+    ''''
+    @requires: d1 ϵ[1,1000]; theta1 ϵ[1.000,180.000]
+    @modifies: None
+    @effects: None
+    @raises: None
+    @returns: find x
+    '''
+    theta1=math.radians(theta1)
+    x = d1*math.tan(theta1)
+    return x
+
+def find_L1(x,d1):
+    ''''
+    @requires: x, d1 ϵ[1,1000]
+    @modifies: None
+    @effects: None
+    @raises: None
+    @returns: find L1
+    '''
+    L1 = math.sqrt((x**2)+(d1**2))
+    return L1
+
+def find_L2(h,x,d2):
+    ''''
+    @requires: h, x, d2 ϵ[1,1000]
+    @modifies: None
+    @effects: None
+    @raises: None
+    @returns: find L2
+    '''
+    L2 = math.sqrt(((h - x)**2) + (d2**2))
+    return L2
+
+def find_t(L1,n,L2,v_sand):
+    ''''
+    @requires: L1, n, L2, v_sand ϵ[1,1000]
+    @modifies: None
+    @effects: None
+    @raises: None
+    @returns: find t
+    '''
+    t = (L1+(n*L2))/v_sand
+    return t
+
 def func_find(d1,d2,h,v_sand,n,theta1): 
     '''
     @requires: d1, d2, h, v_sand, n b ϵ[1,1000]; theta1 ϵ[1.000,180.000]
@@ -31,15 +76,13 @@ def func_find(d1,d2,h,v_sand,n,theta1):
     #в одной миле 5280 футов - 1 час это 60 * 60 секунд
     v_sand = v_sand*5280/(60**2)
 
-    thetar=math.radians(theta1)
+    x = find_x(d1,theta1)
     
-    x = d1*math.tan(thetar)
+    L1 = find_L1(x,d1)
     
-    L1 = math.sqrt((x**2)+(d1**2))
+    L2 = find_L2(h,x,d2) 
     
-    L2 = math.sqrt(((h - x)**2) + (d2**2))
-    
-    t = (L1+(n*L2))/v_sand
+    t = find_t(L1,n,L2,v_sand) 
     
     return t
 
@@ -71,6 +114,7 @@ def test_time_save():
         else:
             print('Test passed')
             passed +=1
+            #output_info(inp[5],t)
     return total,passed
 
 total,passed=test_time_save()
