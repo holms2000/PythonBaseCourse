@@ -198,7 +198,7 @@ def min_time_save():
     '''
     inputs =(8,10,50,5,2)
     mintime =100
-    theta1 = 180
+    theta1 = 0
     for i in float_range(0, 180.001, 0.001):
         t = func_find(inputs[0],inputs[1],inputs[2],inputs[3],inputs[4],i)
         if t < mintime:
