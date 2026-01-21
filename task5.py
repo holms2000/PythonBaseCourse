@@ -15,8 +15,8 @@ BASE_COLOR = sys.argv [2] # Базовый цвет для живых клето
 WIDTH = 0
 HEIGHT = 0
 INPUT_FILE = 'init.csv'                     #имя констант всегда заглавными буквами
-OUTPUT_FILE_CSV = 'generation.csv'
-OUTPUT_FILE_PNG = 'generation.png'
+OUTPUT_FILE_CSV = 'generation' #.csv'
+OUTPUT_FILE_PNG = 'generation' #.png'
                           
 DEBUG = True
 
@@ -85,17 +85,20 @@ def calculate_next_generation(field):
                     
     return new_field
 
-def draw_field(field, filename):
+def draw_field(field, filename,step):
     '''
-    @requires: field  ϵ [], filename ϵ string 
+    @requires: field  ϵ [], filename ϵ string , step  ϵ [1,1000]  
     @modifies: None
     @effects: None
     @raises: None
     @returns: return Drawing a field in PNG format.
     '''
-    img = Image.new('RGB', (WIDTH, HEIGHT), color=BASE_COLOR)
+    scale = 20  # Размер клетки на картинке
+
+    img = Image.new('RGB', (WIDTH * scale, HEIGHT * scale), color=BASE_COLOR)
     draw = ImageDraw.Draw(img)
-    
+    pixels = img.load()
+
     for i in range(HEIGHT):
         for j in range(WIDTH):
             if field[i][j]:
@@ -104,9 +107,13 @@ def draw_field(field, filename):
                 r = age % 255
                 g = age % 255
                 b = age % 255
-                draw.rectangle((j, i, j+1, i+1), fill=(r, g, b))
-    
-    img.save(filename)
+                color=(r, g, b)    
+                # Рисуем квадрат клетки
+                for sy in range(i * scale, (i + 1) * scale):
+                    for sx in range(j * scale, (j + 1) * scale):
+                        pixels[sx, sy] = color
+
+    img.save(f"{filename}{step:03d}.png")
 
 def main():
     '''
@@ -125,13 +132,13 @@ def main():
         next_field = calculate_next_generation(initial_field)
         
         # Сохранение состояния поля
-        with open(OUTPUT_FILE_CSV, 'w') as file:
+        with open(f'{OUTPUT_FILE_CSV}{step+1}.csv', 'w') as file:
             writer = csv.writer(file)
             for row in next_field:
                 writer.writerow(row)
                 
         # Рисование текущего состояния
-        draw_field(next_field, OUTPUT_FILE_PNG)
+        draw_field(next_field, OUTPUT_FILE_PNG,step+1)
         
         initial_field = next_field
 
