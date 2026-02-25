@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS coordinates (
 -- Таблица для рынков (должна быть уникальной по полю FMID)
 CREATE TABLE IF NOT EXISTS markets (
     id SERIAL PRIMARY KEY,
-    FMID VARCHAR(255) UNIQUE, -- Добавляем ограничение unique
+    FMID BIGINT UNIQUE, -- Тип поля FMID остался BIGINT
     MarketName TEXT,
     website TEXT,
     address_id INT REFERENCES addresses(id),
@@ -116,10 +116,12 @@ CREATE TABLE IF NOT EXISTS operating_schedule (
     id SERIAL PRIMARY KEY,
     market_id INT REFERENCES markets(id),
     season_number INT,
-    start_date DATE,
-    start_time TIME,
-    end_date DATE,
-    end_time TIME
+    season_date TEXT,          -- Здесь сохранятся оригинальные строки SeasonXDate
+    season_time TEXT           -- Здесь сохранятся оригинальные строки SeasonXTimes
+    --start_date DATE,
+    --start_time TIME,
+    --end_date DATE,
+    --end_time TIME
 );
 
 -- Таблица для продуктов, продаваемых на рынках
@@ -161,7 +163,7 @@ CREATE TABLE IF NOT EXISTS products (
 -- Таблица для отзывов
 CREATE TABLE IF NOT EXISTS reviews (
     id SERIAL PRIMARY KEY,
-    fmid VARCHAR(255) REFERENCES markets(FMID), -- Внешний ключ теперь работает корректно
+    fmid BIGINT REFERENCES markets(FMID), -- Внешний ключ теперь BIGINT
     rating INTEGER CHECK(rating >= 1 AND rating <= 5),
     comment TEXT,
     author VARCHAR(255) REFERENCES users(username)
@@ -273,7 +275,7 @@ def insert_user(data):
 # Функция для вставки отзывов
 def insert_review(data):
     """Вставка отзыва в таблицу reviews."""
-    fmid = data['fmid']
+    fmid = int(data['fmid'])
     check_query = f"SELECT COUNT(*) FROM markets WHERE FMID=%s;"
     cur.execute(check_query, (fmid,))
     count = cur.fetchone()[0]
@@ -288,143 +290,183 @@ def insert_review(data):
     else:
         print(f"Пропущен отзыв для несуществующего FMID={fmid}.")
 
+# Функция для поиска максимального FMID
+def find_max_fmid():
+    select_max_fmid_query = """
+    SELECT MAX(FMID) FROM markets;
+    """
+    cur.execute(select_max_fmid_query)
+    result = cur.fetchone()
+    max_fmid = result[0] or 0  # Возвращается либо максимальный FMID, либо 0, если таблица пуста
+    return max_fmid
+
 # Логика обработки файла Export.csv
 def process_export_csv(filename):
+    markets_with_fmid = []  # Рынки с установленным FMID
+    markets_without_fmid = []  # Рынки без установленного FMID
+
     with open(filename, mode='r', encoding='utf-8-sig') as file:
         reader = csv.DictReader(file)
     
         for row in reader:
             cleaned_row = {k: v.strip() if isinstance(v, str) else v for k, v in row.items()}
             
-            # Начинаем с адреса
-            address_id = insert_address({
-                'street': cleaned_row.pop('street'),
-                'city': cleaned_row.pop('city'),
-                'county': cleaned_row.pop('County'),
-                'state': cleaned_row.pop('State'),
-                'zip': cleaned_row.pop('zip')
-            })
-            
-            # Координаты
-            x_value = cleaned_row.get('x', '')
-            y_value = cleaned_row.get('y', '')
-            if x_value and y_value:
-                coordinate_id = insert_coordinates({
-                    'latitude': float(x_value),
-                    'longitude': float(y_value)
-                })
+            # Разделяем рынки по наличию FMID
+            if cleaned_row.get('FMID'):
+                markets_with_fmid.append(cleaned_row)
             else:
-                continue
-            
-            # График работы
-            schedules = []
-            for i in range(1, 5):  # Максимум 4 сезона
-                date_field = f'Season{i}Date'
-                time_field = f'Season{i}Time'
-                
-                # Проверяем наличие полей
-                if date_field in cleaned_row and time_field in cleaned_row:
-                    full_season_date = cleaned_row.pop(date_field)
-                    full_season_time = cleaned_row.pop(time_field)
-                    
-                    # Приводим дату к правильному формату
-                    try:
-                        parts = full_season_date.split('-')
-                        start_date_str = parts[0].strip()
-                        end_date_str = parts[-1].strip()
-                        
-                        # Приведение к формату %Y-%m-%d
-                        start_date_obj = datetime.strptime(start_date_str, '%d/%m/%Y').strftime('%Y-%m-%d')
-                        end_date_obj = datetime.strptime(end_date_str, '%d/%m/%Y').strftime('%Y-%m-%d')
-                        
-                        # Преобразуем время в формат HH:MI:SS
-                        start_time = parse_time(full_season_time)
-                        end_time = parse_time(full_season_time)
-                        
-                        # Добавляем график работы
-                        schedules.append({
-                            'market_id': None,  # Позднее присвоим
-                            'season_number': i,
-                            'start_date': start_date_obj,
-                            'start_time': start_time,
-                            'end_date': end_date_obj,
-                            'end_time': end_time
-                        })
-                    except ValueError:
-                        continue  # Пропускаем некорректные данные
-            
-            # Обрабатываем updateTime
-            update_time_raw = cleaned_row.pop('updateTime', None)
-            if update_time_raw is not None:
-                try:
-                    # Приводим строку к объекту datetime
-                    dt_object = datetime.strptime(update_time_raw, "%m/%d/%Y %I:%M:%S %p")
-                    # Конвертируем в нужный формат PostgreSQL
-                    update_time_formatted = dt_object.strftime("%Y-%m-%d %H:%M:%S")
-                except Exception as e:
-                    print(f"Ошибка при обработке updateTime: {e}")
-                    update_time_formatted = None
-            else:
-                update_time_formatted = None
-            
-            # Формируем словарь для вставки в таблицу markets
-            market_data = {
-                'FMID': cleaned_row.pop('FMID'),
-                'MarketName': cleaned_row.pop('MarketName'),
-                'website': cleaned_row.pop('Website'),
-                'address_id': address_id,
-                'coordinate_id': coordinate_id,
-                'update_time': update_time_formatted  # Сохранённое время
-            }
-            
-            # Дальше идёт обычная логика
-            market_id = insert_market(market_data)
-            
-            # Заносим графики работы
-            for schedule in schedules:
-                schedule['market_id'] = market_id
-                insert_operating_schedule(schedule)
-            
-            # Продукты
-            product_columns = [
-                'Organic','Baked_goods', 'Cheese', 'Crafts', 'Flowers', 'Eggs',
-                'Seafood', 'Herbs', 'Vegetables', 'Honey', 'Jams',
-                'Maple', 'Meat', 'Nursery', 'Nuts', 'Plants', 'Poultry',
-                'Prepared', 'Soap', 'Trees', 'Wine', 'Coffee', 'Beans',
-                'Fruits', 'Grains', 'Juices', 'Mushrooms', 'Pet_food',
-                'Tofu', 'Wild_harvested'
-            ]
+                markets_without_fmid.append(cleaned_row)
 
-            product_values = {}
-            for col in product_columns:
-                if col in cleaned_row:  
-                    product_values[col] = True if cleaned_row.pop(col) == 'Y' else False
-                else:
-                    product_values[col] = False  # По умолчанию False, если поле отсутствует
-            
-            product_values['market_id'] = market_id
-            insert_products(product_values)
-            
-            # Платежные опции
-            payment_data = {
-                'market_id': market_id,
-                'credit': True if cleaned_row.pop('Credit') == 'Y' else False,  # Условие на Y
-                'wic': True if cleaned_row.pop('WIC') == 'Y' else False,  # Условие на Y
-                'wic_cash': True if cleaned_row.pop('WICcash') == 'Y' else False,  # Условие на Y
-                'sfmnp': True if cleaned_row.pop('SFMNP') == 'Y' else False,  # Условие на Y
-                'snap': True if cleaned_row.pop('SNAP') == 'Y' else False  # Условие на Y
-            }
-            insert_payment_options(payment_data)
-            
-            # Социальные сети
-            social_data = {
-                'market_id': market_id,
-                'facebook_url': cleaned_row.pop('Facebook'),
-                'twitter_url': cleaned_row.pop('Twitter'),
-                'youtube_url': cleaned_row.pop('Youtube'),
-                'other_media_url': cleaned_row.pop('OtherMedia')
-            }
-            insert_social_links(social_data)
+    # Первым делом вносим рынки с уже известными FMID
+    for market_data in markets_with_fmid:
+        handle_market(market_data)
+
+    # Далее определяем новое значение FMID для остальных рынков
+    current_max_fmid = find_max_fmid()
+
+    # Пройдем по оставшимся рынкам и назначим каждому уникальный FMID
+    for idx, market_data in enumerate(markets_without_fmid):
+        new_fmid = current_max_fmid + idx + 1
+        market_data['FMID'] = new_fmid
+        handle_market(market_data)
+
+# Основной обработчик рынка
+def handle_market(row):
+    # Начнём с адреса
+    address_id = insert_address({
+        'street': row.pop('street'),
+        'city': row.pop('city'),
+        'county': row.pop('County'),
+        'state': row.pop('State'),
+        'zip': row.pop('zip')
+    })
+    
+    # Координаты
+    x_value = row.get('x', '')
+    y_value = row.get('y', '')
+    if x_value and y_value:
+        coordinate_id = insert_coordinates({
+            'latitude': float(x_value),
+            'longitude': float(y_value)
+        })
+    else:
+        coordinate_id = None
+    
+    # Графики работы
+    schedules = []
+    for i in range(1, 5):  # До четырёх сезонов
+        date_field = f'Season{i}Date'
+        time_field = f'Season{i}Time'
+        
+        if date_field in row and time_field in row:
+          
+            season_date = row.pop(date_field)
+            season_time = row.pop(time_field)
+            if season_date!="":   
+              # Сохраняем оригинальные строки в соответствующих полях
+              schedules.append({
+              'market_id': None,  # Присвоим позже
+              'season_number': i,
+              'season_date': season_date,
+              'season_time': season_time
+              })
+            '''
+            try:
+                parts = full_season_date.split('-')
+                start_date_str = parts[0].strip()
+                end_date_str = parts[-1].strip()
+                
+                # Приведение дат к нужному формату (%Y-%m-%d)
+                start_date_obj = datetime.strptime(start_date_str, '%d/%m/%Y').strftime('%Y-%m-%d')
+                end_date_obj = datetime.strptime(end_date_str, '%d/%m/%Y').strftime('%Y-%m-%d')
+                
+                # Преобразование времени в формат HH:MI:SS
+                start_time = parse_time(full_season_time)
+                end_time = parse_time(full_season_time)
+                
+                schedules.append({
+                    'market_id': None,  # Будем указывать позже
+                    'season_number': i,
+                    'start_date': start_date_obj,
+                    'start_time': start_time,
+                    'end_date': end_date_obj,
+                    'end_time': end_time
+                })
+            except ValueError:
+                if full_season_date!="":
+                  print(f'{i} {full_season_date} {full_season_time}')
+                continue  # Игнорируем некорректные данные
+            '''
+    # Дата обновления
+    update_time_raw = row.pop('updateTime', None)
+    if update_time_raw is not None:
+        try:
+            dt_object = datetime.strptime(update_time_raw, "%m/%d/%Y %I:%M:%S %p")
+            update_time_formatted = dt_object.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception as e:
+            print(f"Ошибка при обработке updateTime: {e}")
+            update_time_formatted = None
+    else:
+        update_time_formatted = None
+    
+    # Подготовили основную информацию о рынке
+    market_data = {
+        'FMID': int(row.pop('FMID')) if row.get('FMID') else None,  # Проверяем наличие FMID
+        'MarketName': row.pop('MarketName'),
+        'website': row.pop('Website'),
+        'address_id': address_id,
+        'coordinate_id': coordinate_id,
+        'update_time': update_time_formatted
+    }
+    
+    # Вносим основной объект рынка
+    market_id = insert_market(market_data)
+    
+    # Устанавливаем привязку ко вновь созданному рынку
+    for schedule in schedules:
+        schedule['market_id'] = market_id
+        insert_operating_schedule(schedule)
+    
+    # Продукты
+    product_columns = [
+        'Organic','Baked_goods', 'Cheese', 'Crafts', 'Flowers', 'Eggs',
+        'Seafood', 'Herbs', 'Vegetables', 'Honey', 'Jams',
+        'Maple', 'Meat', 'Nursery', 'Nuts', 'Plants', 'Poultry',
+        'Prepared', 'Soap', 'Trees', 'Wine', 'Coffee', 'Beans',
+        'Fruits', 'Grains', 'Juices', 'Mushrooms', 'Pet_food',
+        'Tofu', 'Wild_harvested'
+    ]
+
+    product_values = {}
+    for col in product_columns:
+        if col in row:  
+            product_values[col] = True if row.pop(col) == 'Y' else False
+        else:
+            product_values[col] = False  # По умолчанию False, если поле отсутствует
+    
+    product_values['market_id'] = market_id
+    insert_products(product_values)
+    
+    # Платежные опции
+    payment_data = {
+        'market_id': market_id,
+        'credit': True if row.pop('Credit') == 'Y' else False,
+        'wic': True if row.pop('WIC') == 'Y' else False,
+        'wic_cash': True if row.pop('WICcash') == 'Y' else False,
+        'sfmnp': True if row.pop('SFMNP') == 'Y' else False,
+        'snap': True if row.pop('SNAP') == 'Y' else False
+    }
+    insert_payment_options(payment_data)
+    
+    # Социальные сети
+    social_data = {
+        'market_id': market_id,
+        'facebook_url': row.pop('Facebook'),
+        'twitter_url': row.pop('Twitter'),
+        'youtube_url': row.pop('Youtube'),
+        'other_media_url': row.pop('OtherMedia')
+    }
+    insert_social_links(social_data)
 
 # Логика обработки всех файлов
 def process_csv_file(filename):
@@ -453,8 +495,8 @@ def process_csv_file(filename):
                     continue  # Пропускаем строку, если fmid пустой
                 
                 data = {
-                    'fmid': cleaned_row.pop('fmid'),  # Поле обязательно должно быть непустое
-                    'rating': int(cleaned_row.pop('rating')),  # Целочисленное значение рейтинга
+                    'fmid': int(cleaned_row.pop('fmid')),
+                    'rating': int(cleaned_row.pop('rating')),
                     'comment': cleaned_row.pop('comment'),
                     'author': cleaned_row.pop('author')
                 }
