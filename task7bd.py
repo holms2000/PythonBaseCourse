@@ -106,10 +106,21 @@ class ReviewManager:
         results = self.db_connector.execute_query(query, (fmid,))
         return [dict(zip(('id', 'fmid', 'rating', 'comment', 'author'), row)) for row in results]
 
-    def delete_review(self, fmid: str, author: str):
-        condition = {'fmid': fmid, 'author': author}
-        self.db_connector.delete_data('reviews', condition)
+    def edit_review(self, fmid: str, new_rating: int, new_comment: str, author: str):
+        """Редактирует существующий отзыв."""
+        query = "UPDATE reviews SET rating=%s, comment=%s WHERE fmid=%s AND author=%s;"
+        with closing(psycopg2.connect(**self.db_connector.db_config)) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (new_rating, new_comment, fmid, author))
+                conn.commit()
 
+    def remove_review(self, fmid: str, author: str):
+        """Удаляет отзыв текущего пользователя."""
+        query = "DELETE FROM reviews WHERE fmid=%s AND author=%s;"
+        with closing(psycopg2.connect(**self.db_connector.db_config)) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (fmid, author))
+                conn.commit()
 # Менеджер рынков
 class MarketManager:
     def __init__(self, db_connector):
@@ -122,8 +133,10 @@ class MarketManager:
         zip_code: Optional[str] = None,
         max_distance_miles: float = None,
         latitude: float = None,
-        longitude: float = None
-    ) -> List[Dict]:
+        longitude: float = None,
+        market_name_part: Optional[str] = None,
+        fmid: Optional[int] = None  
+        ) -> List[Dict]:
         conditions = []
         args = []
         
@@ -145,6 +158,15 @@ class MarketManager:
             conditions.append(f"distance <= %s")
             args.extend([latitude, latitude, longitude, EARTH_RADIUS_MILES, max_distance_miles])
     
+        # Поиск по частичному названию
+        if market_name_part:
+            conditions.append("LOWER(markets.MarketName) LIKE LOWER(%s)")
+            args.append('%' + market_name_part.lower() + '%')
+        # Добавили условие поиска по FMID
+        if fmid is not None:
+           conditions.append("markets.FMID=%s")  # Прямой поиск по FMID
+           args.append(fmid)
+
         # Формируем базовый запрос
         base_query = """SELECT markets.*, addresses.street, addresses.city, addresses.county, addresses.state, addresses.zip,
                             coordinates.latitude, coordinates.longitude"""
@@ -174,41 +196,59 @@ class MarketManager:
             pages.append(markets[start:end])
         return pages
 
-    def show_details(self, fmid: str, review_manager: ReviewManager, logged_in_user: Optional[str]):
+    def show_details(self, fmid_or_name: str, review_manager: ReviewManager, logged_in_user: Optional[str]):
+        # Попытка определить тип ввода: FMID или название
+        try:
+            fmid = int(fmid_or_name)
+            markets = self.find_market_by_criteria(fmid=fmid)
+        except ValueError:
+            # Если введен фрагмент названия, производим поиск по нему
+            markets = self.find_market_by_criteria(market_name_part=fmid_or_name)
+        
+        if not markets:
+            print("Рынок не найден.")
+            return ''
+        
+        # Если найдено несколько рынков, предложить пользователю выбрать нужный
+        if len(markets) > 1:
+            print("Найдено несколько рынков, выберите один:")
+            for idx, mkt in enumerate(markets):
+                print(f"{idx + 1}. {mkt['MarketName']} (FMID: {mkt['FMID']}, город: {mkt['city']})")
+            selected_idx = int(input("Выберите номер рынка: ")) - 1
+            market = markets[selected_idx]
+        else:
+            market = markets[0]
+        
+        # Загружаем дополнительные поля
         query = """SELECT markets.*, addresses.street, addresses.city, addresses.county, addresses.state, addresses.zip, coordinates.latitude, coordinates.longitude, social_links.facebook_url, social_links.twitter_url, social_links.youtube_url, social_links.other_media_url
                    FROM markets
                    JOIN addresses ON markets.address_id=addresses.id
                    JOIN coordinates ON markets.coordinate_id=coordinates.id
                    LEFT JOIN social_links ON markets.id=social_links.market_id
                    WHERE FMID=%s;"""
-        result = self.db_connector.execute_query(query, (fmid,))
+        result = self.db_connector.execute_query(query, (market['FMID'],))
         if not result:
             return None
         market = result[0]
+        
         # Получаем график работы рынка
         schedule_query = "SELECT * FROM operating_schedule WHERE market_id=%s ORDER BY season_number ASC;"
-        schedules = self.db_connector.execute_query(schedule_query, (market[0],))  # Используем индексирование кортежа
-        schedul = schedules[0]
+        schedules = self.db_connector.execute_query(schedule_query, (market[0],))
         schedule_info = "\n".join([
-            f"Сезон {i+1}: {schedul[3]} ({schedul[4]})"
+            f"Сезон {i+1}: {sched[3]} ({sched[4]})"
             for i, sched in enumerate(schedules)
         ]) if schedules else "График работы не указан."
-
+        
         # Получаем перечень продуктов, продаваемых на рынке
         product_query = "SELECT * FROM products WHERE market_id=%s;"
-        products_result = self.db_connector.execute_query(product_query, (market[0],))  # Аналогично, обращаемся по индексу
-        if products_result:
-            product_info = "\nПродукты:\n"
-            product_row = products_result[0]
-            prod=['organic','baked_goods','cheese','crafts','flowers','eggs','seafood','herbs','vegetables','honey','jams','maple','meat','nursery','nuts','plants','poultry','prepared','soap','trees','wine','coffee','beans','fruits','grains','juices','mushrooms','pet_food','tofu','wild_harvested']
-            i = 0
-            for value in product_row:
-                if value==True:
-                   product_info += f"{prod[i]}: Да " #\n"
-                i+=1
-        else:
-            product_info = "Продукты отсутствуют."
-
+        products_result = self.db_connector.execute_query(product_query, (market[0],))
+        product_info = "\nПродукты:\n"
+        product_columns = ['organic', 'baked_goods', 'cheese', 'crafts', 'flowers', 'eggs', 'seafood', 'herbs', 'vegetables', 'honey', 'jams', 'maple', 'meat', 'nursery', 'nuts', 'plants', 'poultry', 'prepared', 'soap', 'trees', 'wine', 'coffee', 'beans', 'fruits', 'grains', 'juices', 'mushrooms', 'pet_food', 'tofu', 'wild_harvested']
+        for col, val in zip(product_columns, products_result[0]):
+           if val:
+            product_info += f"{col}: Да "
+        
+        # Генерируем подробную информацию о рынке
         details = f"""
         Подробная информация о рынке FMID: {market[1]} 
         Название: {market[2]}
@@ -223,15 +263,16 @@ class MarketManager:
         Facebook: {market[14]}
         Twitter: {market[15]}
         Youtube: {market[16]}
-        Other media: {market[17]}
+        Другие медиа: {market[17]}
         График работы:
         {schedule_info}
+        Продукты:
         {product_info}
         Дата последнего обновления: {market[6]}
         """
         print(details)
         # Получаем все отзывы по этому рынку
-        reviews = review_manager.get_reviews_by_fmid(fmid)
+        reviews = review_manager.get_reviews_by_fmid(market[1])
         print("\nОтзывы от всех пользователей:")
         for rev in reviews:
             # Взять имя и фамилию пользователя по логину из БД
@@ -243,8 +284,34 @@ class MarketManager:
             else:
                 full_name = "(неизвестный)"
             print(f"Автор: {full_name} | Рейтинг: {rev['rating']} | Коммент.: {rev['comment']}")
-        quit = input('введите любую букву для возврата в список:')
-        return '' #details
+        
+        # Проверяем, оставил ли текущий пользователь отзыв
+        has_existing_review = any(rev["author"] == logged_in_user for rev in reviews)
+
+        if logged_in_user:
+          if has_existing_review:
+            print("\nВы уже оставили отзыв. Хотите изменить или удалить?")
+            change_action = input("[I] Изменить, [D] Удалить, [B] Назад: ").strip().upper()
+            if change_action == "I":  # Редактировать отзыв
+                new_rating = int(input("Новый рейтинг (от 1 до 5): "))
+                new_comment = input("Новый комментарий: ")
+                review_manager.edit_review(market[1], new_rating, new_comment, logged_in_user)
+                print("Отзыв обновлён.")
+            elif change_action == "D":  # Удалить отзыв
+                review_manager.remove_review(market[1], logged_in_user)
+                print("Отзыв удалён.")
+          else:
+            # Возможность оставить новый отзыв
+            want_to_add_review = input("Хотите оставить отзыв? (Y/N): ").strip().upper()
+            if want_to_add_review == "Y":
+                rating = int(input("Оцените рынок (от 1 до 5 звёзд): "))
+                comment = input("Комментарий (можно оставить пустым): ")
+                review_manager.add_review(market[1], rating, comment, logged_in_user)
+                print("Отзыв успешно добавлен.")
+
+        # Пауза перед возвратом в главное меню
+        quit = input('Введите любую букву для возврата в список:')
+        return ''
 
 # Вспомогательная функция показа основного меню
 def prompt_menu() -> str:
@@ -281,35 +348,37 @@ def view_all_markets(manager: MarketManager, review_manager: ReviewManager, logg
     while current_page < len(pages):
         print(f"\nСтраница {current_page + 1}:")
         for market in pages[current_page]:
-           # Получаем отзывы для текущего рынка
-          reviews = review_manager.get_reviews_by_fmid(market['FMID'])
-          reviews_str = ""
-          if reviews:
-            for rev in reviews:
-                # Прямо запрашиваем имя и фамилию пользователя из базы данных
-                query_get_username = "SELECT firstname, lastname FROM users WHERE username=%s;"
-                user_data = manager.db_connector.execute_query(query_get_username, (rev['author'],))
-                if user_data:
-                    first_name, last_name = user_data[0]
-                    full_name = f"{first_name} {last_name}"
-                else:
-                    full_name = "(неизвестный)"
-                reviews_str += f"    Автор: {full_name} | Рейтинг: {rev['rating']} | Коммент.: {rev['comment']}\n"
-          else:
-            reviews_str = "    Нет отзывов.\n"
-          print(f"- Название: {market['MarketName']}\n"
+            # Получаем отзывы для текущего рынка
+            reviews = review_manager.get_reviews_by_fmid(market['FMID'])
+            reviews_str = ""
+            if reviews:
+                for rev in reviews:
+                    # Запрашиваем имя и фамилию пользователя из базы данных
+                    query_get_username = "SELECT firstname, lastname FROM users WHERE username=%s;"
+                    user_data = manager.db_connector.execute_query(query_get_username, (rev['author'],))
+                    if user_data:
+                        first_name, last_name = user_data[0]
+                        full_name = f"{first_name} {last_name}"
+                    else:
+                        full_name = "(неизвестный)"
+                    reviews_str += f"    Автор: {full_name} | Рейтинг: {rev['rating']} | Коммент.: {rev['comment']}\n"
+            else:
+                reviews_str = "    Нет отзывов.\n"
+                
+            print(f"- Название: {market['MarketName']}\n"
                   f"  FMID: {market['FMID']}\n"
                   f"  Город: {market['city']}\n"
                   f"  Штат: {market['state']}\n"
                   f"  Индекс: {market['zip']}\n"
                   f"  Отзывы:\n{reviews_str}\n")
-        cmd = input("Следующая страница ('n'), предыдущая ('p'), подробнее ('d'), назад ('b'): ").lower()
+        
+        cmd = input("Следующая страница ('n'), предыдущая ('p'), подробности ('d'), назад ('b'): ").lower()
         if cmd == 'n':
             current_page += 1
         elif cmd == 'p':
             current_page -= 1
         elif cmd == 'd':
-            detail_choice = input("Введите FMID рынка для подробностей: ")
+            detail_choice = input("Введите FMID или название рынка для подробностей: ")
             details = manager.show_details(detail_choice, review_manager, logged_in_user)
             if details:
                 print("\nПодробная информация о рынке:")
@@ -348,18 +417,19 @@ def search_markets(manager: MarketManager, review_manager: ReviewManager, logged
                 # Определяем строку с отзывами или уведомление об их отсутствии
                 reviews_str = ""
                 if reviews:
-                  for rev in reviews:
-                  # Прямо запрашиваем имя и фамилию пользователя из базы данных
-                      query_get_username = "SELECT firstname, lastname FROM users WHERE username=%s;"
-                      user_data = manager.db_connector.execute_query(query_get_username, (rev['author'],))
-                      if user_data:
-                        first_name, last_name = user_data[0]
-                        full_name = f"{first_name} {last_name}"
-                      else:
-                          full_name = "(неизвестный)"
-                  reviews_str += f"    Автор: {full_name} | Рейтинг: {rev['rating']} | Коммент.: {rev['comment']}\n"
+                    for rev in reviews:
+                        # Запрашиваем имя и фамилию пользователя из базы данных
+                        query_get_username = "SELECT firstname, lastname FROM users WHERE username=%s;"
+                        user_data = manager.db_connector.execute_query(query_get_username, (rev['author'],))
+                        if user_data:
+                            first_name, last_name = user_data[0]
+                            full_name = f"{first_name} {last_name}"
+                        else:
+                            full_name = "(неизвестный)"
+                        reviews_str += f"    Автор: {full_name} | Рейтинг: {rev['rating']} | Коммент.: {rev['comment']}\n"
                 else:
-                     reviews_str = "    Нет отзывов.\n"
+                    reviews_str = "    Нет отзывов.\n"
+                    
                 print(f"- Название: {market['MarketName']}\n"
                       f"  FMID: {market['FMID']}\n"
                       f"  Город: {market['city']}\n"
@@ -372,7 +442,7 @@ def search_markets(manager: MarketManager, review_manager: ReviewManager, logged
             elif cmd == 'p':
                 current_page -= 1
             elif cmd == 'd':
-                detail_choice = input("Введите FMID рынка для подробностей: ")
+                detail_choice = input("Введите FMID или название рынка для подробностей: ")
                 details = manager.show_details(detail_choice, review_manager, logged_in_user)
                 if details:
                     print("\nПодробная информация о рынке:")
@@ -388,14 +458,52 @@ def search_markets(manager: MarketManager, review_manager: ReviewManager, logged
         print("Нет соответствующих рынков.")
 
 # Оставление отзыва
-def add_review(review_manager: ReviewManager, logged_in_user: str):
+# ...
+def add_review(review_manager: ReviewManager, market_manager: MarketManager, logged_in_user: str):
     """
-    Добавляем новый отзыв пользователю.
+    Добавляет новый отзыв пользователю.
+    Поддерживает поиск рынка как по FMID, так и по частичному названию.
     """
-    fmid = input("Введите FMID рынка: ")
-    rating = int(input("Оцените рынок (1-5 звезд): "))
-    comment = input("Комментарий (можете оставить пустым): ")
-    review_manager.add_review(fmid, rating, comment, logged_in_user)
+    # Спрашиваем FMID или название рынка
+    fmid_or_name = input("Введите FMID или название рынка: ")
+    
+    # Ищем рынок по указанному значению
+    try:
+        # Пробуем преобразовать значение в число, предполагая, что это FMID
+        fmid = int(fmid_or_name)
+        markets = market_manager.find_market_by_criteria(fmid=fmid)
+    except ValueError:
+        # Иначе рассматриваем как название и выполняем поиск по названию
+        markets = market_manager.find_market_by_criteria(market_name_part=fmid_or_name)
+    
+    if not markets:
+        print("Рынок не найден.")
+        return
+    
+    # Если найдена одна запись, используем её
+    if len(markets) == 1:
+        chosen_market = markets[0]['FMID']
+    else:
+        # Предлагают выбрать среди найденных рынков
+        print("Найдено несколько рынков, выберите один:")
+        for idx, mkt in enumerate(markets):
+            print(f"{idx + 1}. {mkt['MarketName']} (FMID: {mkt['FMID']}, город: {mkt['city']})")
+        selection = int(input("Выберите номер рынка: ")) - 1
+        chosen_market = markets[selection]['FMID']
+    
+    # Продолжаем собирать остальные данные для отзыва
+    rating = int(input("Оцените рынок (от 1 до 5 звёзд): "))
+    try:
+        rating = int(rating)
+        if rating < 1 or rating > 5:
+            raise ValueError("Рейтинг должен быть числом от 1 до 5.")
+    except ValueError:
+        print("Ошибка: Неправильный формат оценки. Используйте числа от 1 до 5.")
+        return
+    comment = input("Комментарий (можно оставить пустым): ")
+    
+    # Добавляем отзыв
+    review_manager.add_review(chosen_market, rating, comment, logged_in_user)
     print("Отзыв успешно добавлен.")
 
 # Основная логика приложения
@@ -419,7 +527,7 @@ def run_application(logged_in_user):
             if logged_in_user is None:
                 print("Сначала войдите в аккаунт.")
                 continue
-            add_review(review_mgr, logged_in_user)
+            add_review(review_mgr, market_mgr, logged_in_user)
         else:
             print("Неизвестная операция.")
 
