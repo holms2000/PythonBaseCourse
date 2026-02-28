@@ -144,7 +144,7 @@ class MarketManager:
             conditions.append("addresses.city=%s")
             args.append(city)
         if state:
-            conditions.append("markets.state=%s")
+            conditions.append("addresses.state=%s")
             args.append(state)
         if zip_code:
             conditions.append("addresses.zip=%s")
@@ -152,11 +152,12 @@ class MarketManager:
             
         # Расстояние считаем только при наличии координат
         if max_distance_miles is not None and latitude is not None and longitude is not None:
-            distance_sql = f"""ACOS(SIN(RADIANS(%s))*SIN(RADIANS(coordinates.latitude)) +
-                                COS(RADIANS(%s))*COS(RADIANS(coordinates.latitude)) *
-                                COS(RADIANS(coordinates.longitude-%s))) * %s AS distance"""
-            conditions.append(f"distance <= %s")
-            args.extend([latitude, latitude, longitude, EARTH_RADIUS_MILES, max_distance_miles])
+        # Перемещаем расчет расстояния внутрь WHERE
+          distance_condition = f"""ACOS(SIN(RADIANS({latitude}))*SIN(RADIANS(coordinates.latitude)) +
+                                 COS(RADIANS({latitude}))*COS(RADIANS(coordinates.latitude)) *
+                                 COS(RADIANS(coordinates.longitude-{longitude}))) * {EARTH_RADIUS_MILES} <= %s"""
+          conditions.append(distance_condition)
+          args.append(max_distance_miles)
     
         # Поиск по частичному названию
         if market_name_part:
@@ -170,8 +171,6 @@ class MarketManager:
         # Формируем базовый запрос
         base_query = """SELECT markets.*, addresses.street, addresses.city, addresses.county, addresses.state, addresses.zip,
                             coordinates.latitude, coordinates.longitude"""
-        if max_distance_miles:
-            base_query += f", {distance_sql}"  # добавляем вычисленное поле distance
     
         # Объединение таблиц
         query = f"{base_query}\nFROM markets\nJOIN addresses ON markets.address_id=addresses.id\nJOIN coordinates ON markets.coordinate_id=coordinates.id"
@@ -207,6 +206,7 @@ class MarketManager:
         
         if not markets:
             print("Рынок не найден.")
+            cmd = input("Для возврата в список отобранных рынков введите любой символ: ").lower()
             return ''
         
         # Если найдено несколько рынков, предложить пользователю выбрать нужный
@@ -214,8 +214,15 @@ class MarketManager:
             print("Найдено несколько рынков, выберите один:")
             for idx, mkt in enumerate(markets):
                 print(f"{idx + 1}. {mkt['MarketName']} (FMID: {mkt['FMID']}, город: {mkt['city']})")
-            selected_idx = int(input("Выберите номер рынка: ")) - 1
-            market = markets[selected_idx]
+            while True:
+                     selected_idx = int(input("Выберите номер рынка: ")) - 1
+                     
+                     # Проверяем валидность индекса
+                     if selected_idx > 0 and selected_idx < len(markets):
+                       market = markets[selected_idx]
+                       break  # Выход из цикла при успешном выборе
+                     else:
+                          print(f"Ошибка: Номер рынка вне диапазона от 1 до {len(markets)}. Выберите снова.")
         else:
             market = markets[0]
         
@@ -246,7 +253,7 @@ class MarketManager:
         product_columns = ['organic', 'baked_goods', 'cheese', 'crafts', 'flowers', 'eggs', 'seafood', 'herbs', 'vegetables', 'honey', 'jams', 'maple', 'meat', 'nursery', 'nuts', 'plants', 'poultry', 'prepared', 'soap', 'trees', 'wine', 'coffee', 'beans', 'fruits', 'grains', 'juices', 'mushrooms', 'pet_food', 'tofu', 'wild_harvested']
         for col, val in zip(product_columns, products_result[0]):
            if val:
-            product_info += f"{col}: Да "
+            product_info += f"{col.replace('_', ' ').title()}: Да "
         
         # Генерируем подробную информацию о рынке
         details = f"""
@@ -291,8 +298,8 @@ class MarketManager:
         if logged_in_user:
           if has_existing_review:
             print("\nВы уже оставили отзыв. Хотите изменить или удалить?")
-            change_action = input("[I] Изменить, [D] Удалить, [B] Назад: ").strip().upper()
-            if change_action == "I":  # Редактировать отзыв
+            change_action = input("Хотите изменить ([C]orrection) или удалить ([D]elete) свой отзыв? Или вернуться обратно ([B]ack)? ").strip().upper()
+            if change_action == "C":  # Редактировать отзыв
                 new_rating = int(input("Новый рейтинг (от 1 до 5): "))
                 new_comment = input("Новый комментарий: ")
                 review_manager.edit_review(market[1], new_rating, new_comment, logged_in_user)
@@ -304,7 +311,15 @@ class MarketManager:
             # Возможность оставить новый отзыв
             want_to_add_review = input("Хотите оставить отзыв? (Y/N): ").strip().upper()
             if want_to_add_review == "Y":
-                rating = int(input("Оцените рынок (от 1 до 5 звёзд): "))
+                while True:
+                     rating_input = input("Оцените рынок (от 1 до 5 звёзд): ")
+                     try:
+                         rating = int(rating_input)
+                         if rating < 1 or rating > 5:
+                           raise ValueError("Рейтинг должен быть числом от 1 до 5.")
+                           break
+                     except ValueError:
+                           print("Ошибка: Неправильный формат оценки. Используйте числа от 1 до 5.")
                 comment = input("Комментарий (можно оставить пустым): ")
                 review_manager.add_review(market[1], rating, comment, logged_in_user)
                 print("Отзыв успешно добавлен.")
@@ -384,12 +399,35 @@ def view_all_markets(manager: MarketManager, review_manager: ReviewManager, logg
                 print("\nПодробная информация о рынке:")
                 print(details)
                 cmd = input("Для возврата введите любой символ: ").lower()
+            '''
             else:
                 print("Рынок не найден.")
+            '''
         elif cmd == 'b':
             break
         else:
             print("Неправильная команда.")
+
+def filter_and_sort_by_fixed_rating(filtered_markets: List[Dict], review_manager: ReviewManager, order='desc'):
+    """
+    Возвращает список уже предварительно отфильтрованных рынков, отсортированных по зафиксированному рейтингу (от 1 до 5).
+    :param filtered_markets: предварительный список отфильтрованных рынков
+    :param review_manager: объект ReviewManager
+    :param order: порядок сортировки ('asc' — возрастающая, 'desc' — убывающая)
+    :return: список объектов рынка, отсортированный по рейтингу
+    """
+    # Строим словарь рейтингов для каждого рынка
+    rated_markets = []
+    for market in filtered_markets:
+        reviews = review_manager.get_reviews_by_fmid(market['FMID'])
+        # Выбираем лучший (самый высокий) рейтинг для рынка
+        best_rating = max(review['rating'] for review in reviews) if reviews else 0
+        rated_markets.append({'market': market, 'best_rating': best_rating})
+
+    # Сортируем рынки по лучшему рейтингу
+    rated_markets.sort(key=lambda x: x['best_rating'], reverse=(order != 'asc'))
+
+    return [rm['market'] for rm in rated_markets]
 
 # Поиск рынков
 def search_markets(manager: MarketManager, review_manager: ReviewManager, logged_in_user: Optional[str]):
@@ -401,13 +439,34 @@ def search_markets(manager: MarketManager, review_manager: ReviewManager, logged
     zip_code = input("Индекс (оставьте пустым, если не важен): ") or None
     lat = input("Широта для расчета расстояния (оставьте пустым, если не важно): ") or None
     lon = input("Долгота для расчета расстояния (оставьте пустым, если не важно): ") or None
+    do_sort = input("Применить сортировку по рейтингу? [Y]/N: ").strip().upper() != 'N'
+    
+    # Определим порядок сортировки только если сортировка включена
+    if do_sort:
+        sort_order = input("Порядок сортировки по рейтингу [A]scending/[D]escending (оставьте пустым для Descending): ").strip().upper() or 'DESC'
+    else:
+        sort_order = None  # Неважно, если сортировка отключена
+
     if lat and lon:
-        max_dist = float(input("Максимальное расстояние в милях: "))
+        max_dist_input = input("Максимальное расстояние в милях: ")
+        if max_dist_input.strip():
+            max_dist = float(max_dist_input)
+        else:
+            max_dist = None  # Если поле пустое, устанавливаем None
         found_markets = manager.find_market_by_criteria(city, state, zip_code, max_dist, float(lat), float(lon))
     else:
         found_markets = manager.find_market_by_criteria(city, state, zip_code)
+
+     # Фильтруем и сортируем по рейтингу
+     # Производим сортировку только если сортировка включена
+    if do_sort:
+        filtered_markets = filter_and_sort_by_fixed_rating(found_markets, review_manager, sort_order)
+    else:
+        filtered_markets = found_markets  # Сохраняем исходный порядок, если сортировка отключена
+
+
     if found_markets:
-        pages = manager.paginate_results(found_markets)
+        pages = manager.paginate_results(filtered_markets)
         current_page = 0
         while current_page < len(pages):
             print(f"\nСтраница {current_page + 1}:")
@@ -488,23 +547,149 @@ def add_review(review_manager: ReviewManager, market_manager: MarketManager, log
         print("Найдено несколько рынков, выберите один:")
         for idx, mkt in enumerate(markets):
             print(f"{idx + 1}. {mkt['MarketName']} (FMID: {mkt['FMID']}, город: {mkt['city']})")
-        selection = int(input("Выберите номер рынка: ")) - 1
-        chosen_market = markets[selection]['FMID']
+        while True:
+                     selection = int(input("Выберите номер рынка: ")) - 1
+                     
+                     # Проверяем валидность индекса
+                     if selection > 0 and selection < len(markets):
+                       chosen_market = markets[selection]['FMID']
+                       break  # Выход из цикла при успешном выборе
+                     else:
+                          print(f"Ошибка: Номер рынка вне диапазона от 1 до {len(markets)}. Выберите снова.")
     
-    # Продолжаем собирать остальные данные для отзыва
-    rating = int(input("Оцените рынок (от 1 до 5 звёзд): "))
-    try:
-        rating = int(rating)
-        if rating < 1 or rating > 5:
-            raise ValueError("Рейтинг должен быть числом от 1 до 5.")
-    except ValueError:
-        print("Ошибка: Неправильный формат оценки. Используйте числа от 1 до 5.")
-        return
-    comment = input("Комментарий (можно оставить пустым): ")
+    # Теперь получаем полную информацию о выбранном рынке
+    detailed_market = market_manager.find_market_by_criteria(fmid=chosen_market)[0]
     
-    # Добавляем отзыв
-    review_manager.add_review(chosen_market, rating, comment, logged_in_user)
-    print("Отзыв успешно добавлен.")
+    # Дополнительный запрос для получения полной информации
+    query_full_info = """SELECT markets.*, addresses.street, addresses.city, addresses.county, addresses.state, addresses.zip, coordinates.latitude, coordinates.longitude, social_links.facebook_url, social_links.twitter_url, social_links.youtube_url, social_links.other_media_url
+                         FROM markets
+                         JOIN addresses ON markets.address_id=addresses.id
+                         JOIN coordinates ON markets.coordinate_id=coordinates.id
+                         LEFT JOIN social_links ON markets.id=social_links.market_id
+                         WHERE FMID=%s;"""
+    result = market_manager.db_connector.execute_query(query_full_info, (chosen_market,))
+    if not result:
+        return None
+    market = result[0]
+    
+    # Получаем график работы рынка
+    schedule_query = "SELECT * FROM operating_schedule WHERE market_id=%s ORDER BY season_number ASC;"
+    schedules = market_manager.db_connector.execute_query(schedule_query, (market[0],))
+    schedule_info = "\n".join([
+        f"Сезон {i+1}: {sched[3]} ({sched[4]})"
+        for i, sched in enumerate(schedules)
+    ]) if schedules else "График работы не указан."
+    
+    # Получаем перечень продуктов, продаваемых на рынке
+    product_query = "SELECT * FROM products WHERE market_id=%s;"
+    products_result = market_manager.db_connector.execute_query(product_query, (market[0],))
+    product_info = "\nПродукты:\n"
+    product_columns = ['organic', 'baked_goods', 'cheese', 'crafts', 'flowers', 'eggs', 'seafood', 'herbs', 'vegetables', 'honey', 'jams', 'maple', 'meat', 'nursery', 'nuts', 'plants', 'poultry', 'prepared', 'soap', 'trees', 'wine', 'coffee', 'beans', 'fruits', 'grains', 'juices', 'mushrooms', 'pet_food', 'tofu', 'wild_harvested']
+    for col, val in zip(product_columns, products_result[0]):
+        if val:
+            product_info += f"{col.replace('_', ' ').title()}: Да "
+    
+    # Печать всей доступной информации о рынке
+    details = f"""
+        Подробная информация о рынке FMID: {market[1]} 
+        Название: {market[2]}
+        Улица: {market[7]}
+        Город: {market[8]}
+        Округ: {market[9]}
+        Штат: {market[10]}
+        Индекс: {market[11]}
+        Широта: {market[12]}, Долгота: {market[13]}
+        Веб-сайт: {market[3]}
+        Социальные сети:
+        Facebook: {market[14]}
+        Twitter: {market[15]}
+        Youtube: {market[16]}
+        Другие медиа: {market[17]}
+        График работы:
+        {schedule_info}
+        Продукты:
+        {product_info}
+        Дата последнего обновления: {market[6]}
+        """
+    print(details)
+    '''   
+    print(f"FMID: {market['FMID']}")
+    print(f"Название: {market['MarketName']}")
+    print(f"Улица: {market['street']}")
+    print(f"Город: {market['city']}")
+    print(f"Округ: {market['county']}")
+    print(f"Штат: {market['state']}")
+    print(f"Веб-сайт: {market['website']}")
+    print(f"Социальные сети:")
+    print(f"Facebook: {market['facebook_url']}")
+    print(f"Twitter: {market['twitter_url']}")
+    print(f"Youtube: {market['youtube_url']}")
+    print(f"Другие медиа: {market['other_media_url']}")
+    print(f"График работы:\n{schedule_info}")
+    print(f"Продукты:\n{product_info}")
+    print(f"Дата последнего обновления: {market['update_time']}")
+    '''
+    # Получаем и печатаем существующие отзывы
+    reviews = review_manager.get_reviews_by_fmid(chosen_market)
+    if reviews:
+        print("\nОтзывы пользователей:")
+        for rev in reviews:
+            # Берём имя и фамилию пользователя по логину из БД
+            query_get_username = "SELECT firstname, lastname FROM users WHERE username=%s;"
+            user_data = market_manager.db_connector.execute_query(query_get_username, (rev['author'],))
+            if user_data:
+                first_name, last_name = user_data[0]
+                full_name = f"{first_name} {last_name}"
+            else:
+                full_name = "(неизвестный)"
+            print(f"Автор: {full_name} | Рейтинг: {rev['rating']} | Коммент.: {rev['comment']}")
+    else:
+        print("\nОтзывов пока нет.")
+
+    existing_review = next((r for r in reviews if r['author'] == logged_in_user), None)
+    
+    if existing_review:
+        # Пользователь уже оставил отзыв
+        print("\nВы уже оценили этот рынок.")
+        print(f"Текущий рейтинг: {existing_review['rating']}, Комментарий: {existing_review['comment']}")
+        action = input("Хотите изменить ([C]orrection) или удалить ([D]elete) свой отзыв? Или вернуться обратно ([B]ack)? ").strip().upper()
+        
+        if action == 'C':
+            # Изменить отзыв
+            while True:
+                try:
+                    new_rating = int(input("Введите новый рейтинг (от 1 до 5): "))
+                    if 1 <= new_rating <= 5:
+                        break
+                    else:
+                        print("Рейтинг должен быть числом от 1 до 5.")
+                except ValueError:
+                    print("Ошибка: введённое значение должно быть числом.")
+            new_comment = input("Введите новый комментарий: ")
+            review_manager.edit_review(chosen_market, new_rating, new_comment, logged_in_user)
+            print("Отзыв успешно изменён.")
+        elif action == 'D':
+            # Удалить отзыв
+            review_manager.remove_review(chosen_market, logged_in_user)
+            print("Отзыв успешно удалён.")
+        else:
+            print("Возвращаемся в предыдущее меню.")
+    else:
+        # Новый отзыв
+        want_to_add_review = input("Хотите оставить отзыв? (Y/N): ").strip().upper()
+        if want_to_add_review == "Y":
+          while True:
+               try:
+                   rating = int(input("\nОцените рынок (от 1 до 5 звёзд): "))
+                   if 1 <= rating <= 5:
+                     break
+                   else:
+                        print("Ошибочный диапазон. Введите число от 1 до 5.")
+               except ValueError:
+                     print("Ошибка: введённое значение должно быть числом.")
+          comment = input("Комментарий (можно оставить пустым): ")
+          review_manager.add_review(chosen_market, rating, comment, logged_in_user)
+          print("Отзыв успешно добавлен.")
 
 # Основная логика приложения
 def run_application(logged_in_user):
