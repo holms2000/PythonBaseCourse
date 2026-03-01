@@ -383,7 +383,7 @@ class MarketManager:
                      selected_idx = int(input("Выберите номер рынка: ")) - 1
                      
                      # Проверяем валидность индекса
-                     if selected_idx > 0 and selected_idx < len(markets):
+                     if 0 <= selected_idx < len(markets):
                        market = markets[selected_idx]
                        break  # Выход из цикла при успешном выборе
                      else:
@@ -755,7 +755,7 @@ def add_review(review_manager: ReviewManager, market_manager: MarketManager, log
                      selection = int(input("Выберите номер рынка: ")) - 1
                      
                      # Проверяем валидность индекса
-                     if selection > 0 and selection < len(markets):
+                     if 0 <= selection < len(markets):
                        chosen_market = markets[selection]['FMID']
                        break  # Выход из цикла при успешном выборе
                      else:
