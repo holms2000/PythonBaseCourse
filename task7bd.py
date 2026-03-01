@@ -480,8 +480,7 @@ class MarketManager:
                      rating_input = input("Оцените рынок (от 1 до 5 звёзд): ")
                      try:
                          rating = int(rating_input)
-                         if rating < 1 or rating > 5:
-                           raise ValueError("Рейтинг должен быть числом от 1 до 5.")
+                         if 1 <= rating <= 5:
                            break
                      except ValueError:
                            print("Ошибка: Неправильный формат оценки. Используйте числа от 1 до 5.")
