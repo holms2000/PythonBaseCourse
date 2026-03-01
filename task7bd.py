@@ -635,14 +635,6 @@ def search_markets(manager: MarketManager, review_manager: ReviewManager, logged
     zip_code = input("Индекс (оставьте пустым, если не важен): ") or None
     lat = input("Широта для расчета расстояния (оставьте пустым, если не важно): ") or None
     lon = input("Долгота для расчета расстояния (оставьте пустым, если не важно): ") or None
-    do_sort = input("Применить сортировку по рейтингу? [Y]/N: ").strip().upper() != 'N'
-    
-    # Определим порядок сортировки только если сортировка включена
-    if do_sort:
-        sort_order = input("Порядок сортировки по рейтингу [A]scending/[D]escending (оставьте пустым для Descending): ").strip().upper() or 'DESC'
-    else:
-        sort_order = None  # Неважно, если сортировка отключена
-
     if lat and lon:
         max_dist_input = input("Максимальное расстояние в милях: ")
         if max_dist_input.strip():
@@ -653,6 +645,14 @@ def search_markets(manager: MarketManager, review_manager: ReviewManager, logged
     else:
         found_markets = manager.find_market_by_criteria(city, state, zip_code)
 
+    do_sort = input("Применить сортировку по рейтингу? [Y]/N: ").strip().upper() != 'N'
+    
+    # Определим порядок сортировки только если сортировка включена
+    if do_sort:
+        sort_order = input("Порядок сортировки по рейтингу [A]scending/[D]escending (оставьте пустым для Descending): ").strip().upper() or 'DESC'
+    else:
+        sort_order = None  # Неважно, если сортировка отключена
+         
      # Фильтруем и сортируем по рейтингу
      # Производим сортировку только если сортировка включена
     if do_sort:
