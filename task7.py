@@ -19,6 +19,13 @@ PAGE_SIZE = 10  # Размер страницы для пагинации
 EARTH_RADIUS_MILES = 3958.8  # Радиус Земли в милях
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    ''' 
+    @requires: lat1, lon1, lat2, lon2 ϵ float
+    @modifies: None
+    @effects: None
+    @raises: None
+    @returns: distance between two points on the earth using Haversine formula
+    '''
     """
     Расчет расстояния между двумя точками на Земле с использованием формулы Haversine.
     """
@@ -35,6 +42,13 @@ class ReviewManager:
         self.load_reviews()
 
     def load_reviews(self):
+        ''' 
+        @requires: None
+        @modifies: None
+        @effects: Loads reviews data from a CSV file into memory
+        @raises: None
+        @returns: None
+        '''
         """
         Загружает существующие отзывы из CSV.
         """
@@ -49,6 +63,13 @@ class ReviewManager:
                 self.reviews = list(reader)
 
     def add_review(self, fmid: str, rating: int, comment: str, author: str):
+        ''' 
+        @requires: fmid, rating, comment, author ϵ string
+        @modifies: Reviews list and CSV file
+        @effects: Adds a new review to the system
+        @raises: None
+        @returns: None
+        '''
         """
         Добавляет новый отзыв к выбранному фермерскому рынку.
         """
@@ -62,6 +83,13 @@ class ReviewManager:
         self.save_reviews()
 
     def save_reviews(self):
+        ''' 
+        @requires: None
+        @modifies: Reviews CSV file
+        @effects: Writes reviews back to the CSV file
+        @raises: None
+        @returns: None
+        '''
         """
         Сохраняет отзывы в CSV-файл.
         """
@@ -71,12 +99,26 @@ class ReviewManager:
             writer.writerows(self.reviews)
 
     def get_reviews_by_fmid(self, fmid: str) -> List[Dict]:
+        ''' 
+        @requires: fmid ϵ string
+        @modifies: None
+        @effects: Filters reviews based on fmid
+        @raises: None
+        @returns: All reviews of specific market
+        '''
         """
         Возвращает все отзывы конкретного рынка.
         """
         return [review for review in self.reviews if review['fmid'] == fmid]
     
     def delete_review(self, fmid: str, author: str):
+        ''' 
+        @requires: fmid, author ϵ string
+        @modifies: Reviews list and CSV file
+        @effects: Deletes a user's review for a particular market
+        @raises: None
+        @returns: Boolean indicating success/failure
+        '''
         """
         Удаляет отзыв пользователя по идентификатору рынка и авторству.
         """
@@ -89,6 +131,13 @@ class ReviewManager:
         return False
 
     def select_review_to_delete(self, fmid: str, author: str):
+        ''' 
+        @requires: fmid, author ϵ string
+        @modifies: None
+        @effects: Helps user choose which review to delete
+        @raises: None
+        @returns: Selected review object or None
+        '''
         """
         Помогает пользователю выбрать отзыв для удаления.
         """
@@ -116,6 +165,13 @@ class UserManager:
         self.load_users()
 
     def load_users(self):
+       ''' 
+       @requires: None
+       @modifies: None
+       @effects: Loads user information from a CSV file
+       @raises: None
+       @returns: None
+       '''
        if not os.path.exists(self.users_csv):
          with open(self.users_csv, 'w', newline='', encoding='utf-8') as file:
             writer = csv.DictWriter(file, fieldnames=['username', 'password_hash', 'firstname', 'lastname'])
@@ -128,12 +184,26 @@ class UserManager:
             self.users = {row['username']: row for row in reader}
 
     def check_user_exists(self, username: str) -> bool:
+        ''' 
+        @requires: username ϵ string
+        @modifies: None
+        @effects: Checks whether a user exists
+        @raises: None
+        @returns: Boolean indicating existence
+        '''
         """
         Проверяет наличие пользователя.
         """
         return username in self.users
 
     def create_user(self, username: str, password: str, firstname: str, lastname: str):
+       ''' 
+       @requires: username, password, firstname, lastname ϵ string
+       @modifies: Users dictionary and CSV file
+       @effects: Creates a new user account
+       @raises: ValueError if validation fails
+       @returns: None
+       '''
        """
        Создание нового пользователя с хэшированным паролем.
        """
@@ -156,6 +226,13 @@ class UserManager:
        self.save_users()
 
     def verify_login(self, username: str, password: str) -> bool:
+       ''' 
+       @requires: username, password ϵ string
+       @modifies: None
+       @effects: Authenticates user credentials
+       @raises: None
+       @returns: Boolean indicating successful login
+       '''
        """
        Аутентификация пользователя.
        """
@@ -170,6 +247,13 @@ class UserManager:
        return stored_hash == provided_hash
 
     def save_users(self):
+       ''' 
+       @requires: None
+       @modifies: Users CSV file
+       @effects: Persists user data to disk
+       @raises: None
+       @returns: None
+       '''
        """
        Сохраняет пользователей в CSV-файл, дописывая новые данные.
        """
@@ -205,6 +289,13 @@ class MarketManager:
         self.load_markets()
 
     def load_markets(self):
+        ''' 
+         @requires: None
+         @modifies: None
+         @effects: Loads markets data from a CSV file
+         @raises: None
+         @returns: None
+        '''
         """
         Загружает фермерские рынки из CSV.
         """
@@ -239,6 +330,13 @@ class MarketManager:
         latitude: float = None,
         longitude: float = None
     ) -> List[Dict]:
+        ''' 
+        @requires: city, state, zip_code ϵ string OR None, max_distance_miles, latitude, longitude ϵ float OR None
+        @modifies: None
+        @effects: Filters markets based on location criteria
+        @raises: None
+        @returns: Filtered list of markets
+        '''
         """
         Выполняет фильтрацию по критериям города, штата, индекса и расстояния.
         """
@@ -259,6 +357,13 @@ class MarketManager:
         return result
 
     def sort_markets(self, markets: List[Dict], field: str, reverse=False) -> List[Dict]:
+        ''' 
+        @requires: markets ϵ [], field ϵ string, reverse ϵ boolean
+        @modifies: None
+        @effects: Sorts markets by a specific attribute
+        @raises: None
+        @returns: Sorted list of markets
+        '''
         """
         Сортирует фермы по указанному полю (например, рейтингу, названию и т.д.)
         """
@@ -266,6 +371,13 @@ class MarketManager:
         return sorted_markets
 
     def paginate_results(self, markets: List[Dict]) -> List[List[Dict]]:
+        ''' 
+        @requires: markets ϵ []
+        @modifies: None
+        @effects: Divides results into multiple pages
+        @raises: None
+        @returns: Paginated lists of markets
+        '''
         """
         Формирует страницы вывода для удобной визуализации результатов.
         """
@@ -278,6 +390,13 @@ class MarketManager:
         return pages
     
     def show_details(self, fmid: str, review_manager: ReviewManager, logged_in_user: Optional[str]):
+        ''' 
+        @requires: fmid ϵ string, review_manager ϵ ReviewManager instance, logged_in_user ϵ string OR None
+        @modifies: None
+        @effects: Displays detailed info about a market including reviews
+        @raises: None
+        @returns: Detailed market information or None
+        '''
         """
         Показывает подробную информацию о рынке по его FMID и даёт возможность удалить отзыв.
         """
@@ -391,6 +510,13 @@ def prompt_menu() -> str:
 
 
 def view_all_markets(manager: MarketManager, review_manager: ReviewManager, logged_in_user: Optional[str]):
+    ''' 
+    @requires: manager ϵ MarketManager instance, review_manager ϵ ReviewManager instance, logged_in_user ϵ string OR None
+    @modifies: None
+    @effects: Outputs all markets with pagination support
+    @raises: None
+    @returns: None
+    '''
     """
     Функция просмотра всех рынков с пагинацией и отображением отзывов.
     """
@@ -446,6 +572,13 @@ def view_all_markets(manager: MarketManager, review_manager: ReviewManager, logg
             print("Неправильная команда.")
 
 def search_markets(manager: MarketManager, review_manager: ReviewManager, logged_in_user: Optional[str]):
+    ''' 
+    @requires: manager ϵ MarketManager instance, review_manager ϵ ReviewManager instance, logged_in_user ϵ string OR None
+    @modifies: None
+    @effects: Search markets by different filters
+    @raises: None
+    @returns: None
+    '''
     """
     Функция поиска рынков по заданным критериям.
     """
@@ -508,6 +641,13 @@ def search_markets(manager: MarketManager, review_manager: ReviewManager, logged
 
 
 def add_review(review_manager: ReviewManager, logged_in_user: str):
+    ''' 
+    @requires: review_manager ϵ ReviewManager instance, logged_in_user ϵ string
+    @modifies: None
+    @effects: Add a new review for a specific market
+    @raises: None
+    @returns: None
+    '''
     """
     Добавляем новый отзыв пользователю.
     """
@@ -519,6 +659,13 @@ def add_review(review_manager: ReviewManager, logged_in_user: str):
 
 
 def run_application(logged_in_user):
+    ''' 
+    @requires: logged_in_user ϵ string OR None
+    @modifies: None
+    @effects: Runs the main loop of the application
+    @raises: None
+    @returns: None
+    '''
     """
     Основной цикл работы приложения.
     """
@@ -545,6 +692,13 @@ def run_application(logged_in_user):
 
 
 def login_or_register(user_mgr: UserManager):
+    ''' 
+    @requires: user_mgr ϵ UserManager instance
+    @modifies: logged_in_user variable
+    @effects: Logs in or registers a new user
+    @raises: None
+    @returns: Username of logged-in user
+    '''
     """
     Вход или регистрация пользователя.
     """

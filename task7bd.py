@@ -5,15 +5,28 @@ from datetime import datetime
 from hashlib import sha256
 from typing import List, Dict, Optional
 from functools import partial
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Константы
 EARTH_RADIUS_MILES = 3958.8  # Радиус Земли в милях
 
 # Конфигурация подключения к базе данных
+'''
+вариант с .env
+db_config = {
+    'dbname': 'farmers_db',
+    'user': os.getenv("LOGIN"),
+    'password':os.getenv("PASSWORD"),
+    'host': 'localhost',
+    'port': '5433'
+}
+'''
 db_config = {
     'dbname': 'farmers_db',
     'user': 'sasha',
-    'password': '1973',
+    'password':'1973',
     'host': 'localhost',
     'port': '5433'
 }
@@ -21,15 +34,39 @@ db_config = {
 # Класс для управления соединением с базой данных
 class DatabaseConnection:
     def __init__(self, db_config):
+        '''
+        Initialize the database connection object using configuration parameters.
+        @requires: db_config ϵ dict
+        @modifies: None
+        @effects: Creates a new instance of DatabaseConnection.
+        @raises: None
+        @returns: None
+        '''
         self.db_config = db_config
 
     def execute_query(self, query, params=None):
+        '''
+        Execute a SQL query on the connected database and fetch its results.
+        @requires: query ϵ string, params ϵ Optional[tuple|list]
+        @modifies: None
+        @effects: Executes the query against the database and returns fetched rows.
+        @raises: None
+        @returns: list of tuples containing query results
+        '''
         with closing(psycopg2.connect(**self.db_config)) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(query, params)
                 return cursor.fetchall()
 
     def insert_data(self, table, data):
+        '''
+        Insert a single record into the specified table.
+        @requires: table ϵ string, data ϵ dict
+        @modifies: The database content will be modified.
+        @effects: Adds one row to the target table.
+        @raises: None
+        @returns: None
+        '''
         columns = ', '.join(data.keys())
         placeholders = ', '.join(['%s'] * len(data))
         values = tuple(data.values())
@@ -40,6 +77,14 @@ class DatabaseConnection:
                 conn.commit()
 
     def update_data(self, table, set_values, condition):
+        '''
+        Update records in the given table based on specific conditions.
+        @requires: table ϵ string, set_values ϵ dict, condition ϵ dict
+        @modifies: The database content will be updated.
+        @effects: Updates matching records according to the given condition.
+        @raises: None
+        @returns: None
+        '''
         set_clause = ", ".join([f"{key}=%s" for key in set_values.keys()])
         where_clause = " AND ".join([f"{k}=%s" for k in condition.keys()])
         values = list(set_values.values()) + list(condition.values())
@@ -50,6 +95,14 @@ class DatabaseConnection:
                 conn.commit()
 
     def delete_data(self, table, condition):
+        '''
+        Delete records from the given table based on specific conditions.
+        @requires: table ϵ string, condition ϵ dict
+        @modifies: The database content will be deleted.
+        @effects: Removes matching records according to the given condition.
+        @raises: None
+        @returns: None
+        '''
         where_clause = " AND ".join([f"{k}=%s" for k in condition.keys()])
         values = tuple(condition.values())
         query = f"DELETE FROM {table} WHERE {where_clause};"
@@ -61,14 +114,38 @@ class DatabaseConnection:
 # Менеджер пользователей
 class UserManager:
     def __init__(self, db_connector):
+        '''
+        Create an instance of UserManager with a reference to the database connector.
+        @requires: db_connector ϵ DatabaseConnection
+        @modifies: None
+        @effects: Initializes a new UserManager instance.
+        @raises: None
+        @returns: None
+        '''
         self.db_connector = db_connector
 
     def check_user_exists(self, username: str) -> bool:
+        '''
+        Check whether a user exists in the system by their username.
+        @requires: username ϵ string
+        @modifies: None
+        @effects: Queries the database to determine existence.
+        @raises: None
+        @returns: Boolean indicating whether the user exists.
+        '''
         query = "SELECT COUNT(*) FROM users WHERE username=%s;"
         result = self.db_connector.execute_query(query, (username,))
         return result[0][0] > 0
 
     def create_user(self, username: str, password: str, firstname: str, lastname: str):
+        '''
+        Register a new user account.
+        @requires: username, password, firstname, lastname ϵ string
+        @modifies: The database will have a new user added.
+        @effects: Inserts a new user into the users table.
+        @raises: None
+        @returns: None
+        '''
         hashed_password = sha256(password.encode()).hexdigest()
         data = {
             'username': username,
@@ -79,6 +156,14 @@ class UserManager:
         self.db_connector.insert_data('users', data)
 
     def verify_login(self, username: str, password: str) -> bool:
+        '''
+        Verify user's credentials during authentication.
+        @requires: username, password ϵ string
+        @modifies: None
+        @effects: Checks the entered credentials against those stored in the database.
+        @raises: None
+        @returns: Boolean indicating successful login attempt.
+        '''
         query = "SELECT password_hash FROM users WHERE username=%s;"
         result = self.db_connector.execute_query(query, (username,))
         if not result:
@@ -90,9 +175,25 @@ class UserManager:
 # Менеджер отзывов
 class ReviewManager:
     def __init__(self, db_connector):
+        '''
+        Initialize the ReviewManager class with a database connector.
+        @requires: db_connector ϵ DatabaseConnection
+        @modifies: None
+        @effects: Initializes a new ReviewManager instance.
+        @raises: None
+        @returns: None
+        '''
         self.db_connector = db_connector
 
     def add_review(self, fmid: str, rating: int, comment: str, author: str):
+        '''
+        Add a new review for a farmer's market identified by FMID.
+        @requires: fmid ϵ string, rating ϵ integer, comment ϵ string, author ϵ string
+        @modifies: The database will store a new review.
+        @effects: Inserts a new review into the reviews table.
+        @raises: None
+        @returns: None
+        '''
         data = {
             'fmid': fmid,
             'rating': rating,
@@ -102,11 +203,27 @@ class ReviewManager:
         self.db_connector.insert_data('reviews', data)
 
     def get_reviews_by_fmid(self, fmid: str) -> List[Dict]:
+        '''
+        Retrieve all reviews associated with a particular farmer's market by FMID.
+        @requires: fmid ϵ string
+        @modifies: None
+        @effects: Fetches all related reviews from the database.
+        @raises: None
+        @returns: List of dictionaries containing review details.
+        '''
         query = "SELECT * FROM reviews WHERE fmid=%s;"
         results = self.db_connector.execute_query(query, (fmid,))
         return [dict(zip(('id', 'fmid', 'rating', 'comment', 'author'), row)) for row in results]
 
     def edit_review(self, fmid: str, new_rating: int, new_comment: str, author: str):
+        '''
+        Edit an existing review for a farmer's market.
+        @requires: fmid ϵ string, new_rating ϵ integer, new_comment ϵ string, author ϵ string
+        @modifies: The database will modify an existing review.
+        @effects: Updates a review's rating and comment fields.
+        @raises: None
+        @returns: None
+        '''
         """Редактирует существующий отзыв."""
         query = "UPDATE reviews SET rating=%s, comment=%s WHERE fmid=%s AND author=%s;"
         with closing(psycopg2.connect(**self.db_connector.db_config)) as conn:
@@ -115,6 +232,14 @@ class ReviewManager:
                 conn.commit()
 
     def remove_review(self, fmid: str, author: str):
+        '''
+        Remove a review made by a specific user for a farmer's market.
+        @requires: fmid ϵ string, author ϵ string
+        @modifies: The database will delete the corresponding review.
+        @effects: Deletes a review from the reviews table.
+        @raises: None
+        @returns: None
+        '''
         """Удаляет отзыв текущего пользователя."""
         query = "DELETE FROM reviews WHERE fmid=%s AND author=%s;"
         with closing(psycopg2.connect(**self.db_connector.db_config)) as conn:
@@ -124,6 +249,14 @@ class ReviewManager:
 # Менеджер рынков
 class MarketManager:
     def __init__(self, db_connector):
+        '''
+        Initialize the MarketManager class with a database connector.
+        @requires: db_connector ϵ DatabaseConnection
+        @modifies: None
+        @effects: Initializes a new MarketManager instance.
+        @raises: None
+        @returns: None
+        '''
         self.db_connector = db_connector
 
     def find_market_by_criteria(
@@ -137,6 +270,14 @@ class MarketManager:
         market_name_part: Optional[str] = None,
         fmid: Optional[int] = None  
         ) -> List[Dict]:
+        '''
+        Search for farmers markets based on various criteria such as location, proximity, etc.
+        @requires: city, state, zip_code, market_name_part ϵ Optional[string]; max_distance_miles, latitude, longitude ϵ Optional[float]; fmid ϵ Optional[int]
+        @modifies: None
+        @effects: Queries the database and retrieves relevant market entries.
+        @raises: None
+        @returns: List of dictionaries containing market details.
+        '''
         conditions = []
         args = []
         
@@ -182,10 +323,26 @@ class MarketManager:
         return [dict(zip(('id', 'FMID', 'MarketName', 'website', 'address_id', 'coordinate_id', 'update_time', 'street', 'city', 'county', 'state', 'zip', 'latitude', 'longitude', 'distance' if max_distance_miles else ''), row)) for row in results]
 
     def sort_markets(self, markets: List[Dict], field: str, reverse=False) -> List[Dict]:
+        '''
+        Sort a list of markets based on a specified field.
+        @requires: markets ϵ List[Dict], field ϵ string
+        @modifies: None
+        @effects: Sorts the input list of markets.
+        @raises: None
+        @returns: Sorted list of market dictionaries.
+        '''
         sorted_markets = sorted(markets, key=lambda x: x[field], reverse=reverse)
         return sorted_markets
 
     def paginate_results(self, markets: List[Dict]) -> List[List[Dict]]:
+        '''
+        Paginate a large list of markets into smaller chunks.
+        @requires: markets ϵ List[Dict]
+        @modifies: None
+        @effects: Divides the input list into multiple pages.
+        @raises: None
+        @returns: List of lists, each sub-list being a page of market results.
+        '''
         PAGE_SIZE = 10
         pages = []
         num_pages = math.ceil(len(markets) / PAGE_SIZE)
@@ -196,6 +353,14 @@ class MarketManager:
         return pages
 
     def show_details(self, fmid_or_name: str, review_manager: ReviewManager, logged_in_user: Optional[str]):
+        '''
+        Display detailed information about a specific farmer's market including reviews.
+        @requires: fmid_or_name ϵ string, review_manager ϵ ReviewManager, logged_in_user ϵ Optional[string]
+        @modifies: None
+        @effects: Retrieves detailed market info and prints it along with reviews.
+        @raises: None
+        @returns: String indicating success or failure.
+        '''
         # Попытка определить тип ввода: FMID или название
         try:
             fmid = int(fmid_or_name)
@@ -330,6 +495,14 @@ class MarketManager:
 
 # Вспомогательная функция показа основного меню
 def prompt_menu() -> str:
+    '''
+    Display main application menu and capture user input.
+    @requires: None
+    @modifies: None
+    @effects: Prints available options to stdout and captures user input.
+    @raises: None
+    @returns: A string representing the user's choice.
+    '''
     """
     Показывает основное меню и возвращает выбор пользователя.
     """
@@ -351,6 +524,14 @@ def prompt_menu() -> str:
 
 # Просмотр всех рынков
 def view_all_markets(manager: MarketManager, review_manager: ReviewManager, logged_in_user: Optional[str]):
+    '''
+    View all available farmer's markets with pagination and ability to see individual market details.
+    @requires: manager ϵ MarketManager, review_manager ϵ ReviewManager, logged_in_user ϵ Optional[string]
+    @modifies: None
+    @effects: Prints market details and allows navigation through them.
+    @raises: None
+    @returns: None
+    '''
     """
     Функция просмотра всех рынков с пагинацией и отображением отзывов.
     """
@@ -409,6 +590,14 @@ def view_all_markets(manager: MarketManager, review_manager: ReviewManager, logg
             print("Неправильная команда.")
 
 def filter_and_sort_by_fixed_rating(filtered_markets: List[Dict], review_manager: ReviewManager, order='desc'):
+    '''
+    Return a list of pre-filtered markets sorted by fixed ratings (1–5 stars).
+    @requires: filtered_markets ϵ List[Dict], review_manager ϵ ReviewManager, order ϵ {'asc','desc'}
+    @modifies: None
+    @effects: Sorts the list of markets by their highest review rating.
+    @raises: None
+    @returns: List of market objects sorted by rating.
+    '''
     """
     Возвращает список уже предварительно отфильтрованных рынков, отсортированных по зафиксированному рейтингу (от 1 до 5).
     :param filtered_markets: предварительный список отфильтрованных рынков
@@ -431,6 +620,14 @@ def filter_and_sort_by_fixed_rating(filtered_markets: List[Dict], review_manager
 
 # Поиск рынков
 def search_markets(manager: MarketManager, review_manager: ReviewManager, logged_in_user: Optional[str]):
+    '''
+    Function to search farmer's markets based on specified criteria.
+    @requires: manager ϵ MarketManager, review_manager ϵ ReviewManager, logged_in_user ϵ Optional[string]
+    @modifies: None
+    @effects: Displays filtered markets and handles paging.
+    @raises: None
+    @returns: None
+    '''
     """
     Функция поиска рынков по заданным критериям.
     """
@@ -519,6 +716,14 @@ def search_markets(manager: MarketManager, review_manager: ReviewManager, logged
 # Оставление отзыва
 # ...
 def add_review(review_manager: ReviewManager, market_manager: MarketManager, logged_in_user: str):
+    '''
+    Allows a registered user to leave a review for a farmer's market.
+    @requires: review_manager ϵ ReviewManager, market_manager ϵ MarketManager, logged_in_user ϵ string
+    @modifies: The database will store a new review.
+    @effects: Collects review inputs from the user and inserts them into the database.
+    @raises: None
+    @returns: None
+    '''
     """
     Добавляет новый отзыв пользователю.
     Поддерживает поиск рынка как по FMID, так и по частичному названию.
@@ -612,23 +817,7 @@ def add_review(review_manager: ReviewManager, market_manager: MarketManager, log
         Дата последнего обновления: {market[6]}
         """
     print(details)
-    '''   
-    print(f"FMID: {market['FMID']}")
-    print(f"Название: {market['MarketName']}")
-    print(f"Улица: {market['street']}")
-    print(f"Город: {market['city']}")
-    print(f"Округ: {market['county']}")
-    print(f"Штат: {market['state']}")
-    print(f"Веб-сайт: {market['website']}")
-    print(f"Социальные сети:")
-    print(f"Facebook: {market['facebook_url']}")
-    print(f"Twitter: {market['twitter_url']}")
-    print(f"Youtube: {market['youtube_url']}")
-    print(f"Другие медиа: {market['other_media_url']}")
-    print(f"График работы:\n{schedule_info}")
-    print(f"Продукты:\n{product_info}")
-    print(f"Дата последнего обновления: {market['update_time']}")
-    '''
+
     # Получаем и печатаем существующие отзывы
     reviews = review_manager.get_reviews_by_fmid(chosen_market)
     if reviews:
@@ -693,6 +882,14 @@ def add_review(review_manager: ReviewManager, market_manager: MarketManager, log
 
 # Основная логика приложения
 def run_application(logged_in_user):
+    '''
+    Main loop for running the application logic.
+    @requires: logged_in_user ϵ Optional[string]
+    @modifies: None
+    @effects: Runs the core functionality of the app.
+    @raises: None
+    @returns: None
+    '''
     """
     Основной цикл работы приложения.
     """
@@ -718,6 +915,14 @@ def run_application(logged_in_user):
 
 # Логин или регистрация пользователя
 def login_or_register(user_mgr: UserManager):
+    '''
+    Login or register a new user account.
+    @requires: user_mgr ϵ UserManager
+    @modifies: The database may be updated with a new user.
+    @effects: Authenticates or registers a user depending on their choice.
+    @raises: None
+    @returns: Username of the authenticated/registered user.
+    '''
     """
     Вход или регистрация пользователя.
     """

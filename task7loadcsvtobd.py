@@ -15,6 +15,14 @@ TIME_PATTERN = r'\d+:\d+\s*(?:AM|PM)?'
 
 # Функция для преобразования времени
 def parse_time(time_string):
+    '''
+    Extract and format time from a string representation.
+    @requires: time_string ϵ string
+    @modifies: None
+    @effects: Parses the time from a string like "HH:mm AM/PM" and converts it to "HH:MM:SS".
+    @raises: None
+    @returns: Formatted time string or None if no valid time was found.
+    '''
     match = re.search(TIME_PATTERN, time_string)
     if match:
         raw_time = match.group().strip()
@@ -197,6 +205,14 @@ conn.commit()
 
 # Вспомогательные функции для вставки данных
 def insert_address(data):
+    '''
+    Insert a new address record into the addresses table.
+    @requires: data ϵ dict
+    @modifies: Database tables are modified.
+    @effects: Inserts a new address into the addresses table.
+    @raises: None
+    @returns: ID of newly inserted address.
+    '''
     """Вставка адреса в таблицу addresses."""
     columns = ', '.join(data.keys())
     placeholders = ', '.join(['%s'] * len(data))
@@ -207,6 +223,14 @@ def insert_address(data):
     return cur.fetchone()[0]
 
 def insert_coordinates(data):
+    '''
+    Insert a new coordinate record into the coordinates table.
+    @requires: data ϵ dict
+    @modifies: Database tables are modified.
+    @effects: Inserts a new pair of coordinates into the coordinates table.
+    @raises: None
+    @returns: ID of newly inserted coordinates.
+    '''
     """Вставка координат в таблицу coordinates."""
     columns = ', '.join(data.keys())
     placeholders = ', '.join(['%s'] * len(data))
@@ -217,6 +241,14 @@ def insert_coordinates(data):
     return cur.fetchone()[0]
 
 def insert_operating_schedule(data):
+    '''
+    Insert a new operating schedule record into the operating_schedule table.
+    @requires: data ϵ dict
+    @modifies: Database tables are modified.
+    @effects: Inserts a new schedule entry into the operating_schedule table.
+    @raises: None
+    @returns: None
+    '''
     """Вставка графика работы в таблицу operating_schedule."""
     columns = ', '.join(data.keys())
     placeholders = ', '.join(['%s'] * len(data))
@@ -226,6 +258,14 @@ def insert_operating_schedule(data):
     conn.commit()
 
 def insert_payment_options(data):
+    '''
+    Insert payment options for a market into the payment_options table.
+    @requires: data ϵ dict
+    @modifies: Database tables are modified.
+    @effects: Inserts payment methods used at a market into the payment_options table.
+    @raises: None
+    @returns: None
+    '''
     """Вставка платёжных опций в таблицу payment_options."""
     columns = ', '.join(data.keys())
     placeholders = ', '.join(['%s'] * len(data))
@@ -235,6 +275,14 @@ def insert_payment_options(data):
     conn.commit()
 
 def insert_products(data):
+    '''
+    Insert product availability for a market into the products table.
+    @requires: data ϵ dict
+    @modifies: Database tables are modified.
+    @effects: Inserts the types of products sold at a market into the products table.
+    @raises: None
+    @returns: None
+    '''
     """Вставка продуктов в таблицу products."""
     columns = ', '.join(data.keys())
     placeholders = ', '.join(['%s'] * len(data))
@@ -244,6 +292,14 @@ def insert_products(data):
     conn.commit()
 
 def insert_market(data):
+    '''
+    Insert a new market record into the markets table.
+    @requires: data ϵ dict
+    @modifies: Database tables are modified.
+    @effects: Inserts a new market into the markets table.
+    @raises: None
+    @returns: ID of newly inserted market.
+    '''
     """Вставка информации о рынке в таблицу markets."""
     columns = ', '.join(data.keys())
     placeholders = ', '.join(['%s'] * len(data))
@@ -254,6 +310,14 @@ def insert_market(data):
     return cur.fetchone()[0]
 
 def insert_social_links(data):
+    '''
+    Insert social media links for a market into the social_links table.
+    @requires: data ϵ dict
+    @modifies: Database tables are modified.
+    @effects: Inserts social media URLs for a market into the social_links table.
+    @raises: None
+    @returns: None
+    '''
     """Вставка ссылок на соцсети в таблицу social_links."""
     columns = ', '.join(data.keys())
     placeholders = ', '.join(['%s'] * len(data))
@@ -264,6 +328,14 @@ def insert_social_links(data):
 
 # Функция для вставки пользователей
 def insert_user(data):
+    '''
+    Insert a new user record into the users table.
+    @requires: data ϵ dict
+    @modifies: Database tables are modified.
+    @effects: Inserts a new user into the users table.
+    @raises: None
+    @returns: None
+    '''
     """Вставка пользователя в таблицу users."""
     columns = ', '.join(data.keys())
     placeholders = ', '.join(['%s'] * len(data))
@@ -274,6 +346,14 @@ def insert_user(data):
 
 # Функция для вставки отзывов
 def insert_review(data):
+    '''
+    Insert a new review record into the reviews table.
+    @requires: data ϵ dict
+    @modifies: Database tables are modified.
+    @effects: Inserts a new review into the reviews table only if the referenced market exists.
+    @raises: None
+    @returns: None
+    '''
     """Вставка отзыва в таблицу reviews."""
     fmid = int(data['fmid'])
     check_query = f"SELECT COUNT(*) FROM markets WHERE FMID=%s;"
@@ -292,6 +372,14 @@ def insert_review(data):
 
 # Функция для поиска максимального FMID
 def find_max_fmid():
+    '''
+    Find the maximum FMID value currently present in the markets table.
+    @requires: None
+    @modifies: None
+    @effects: Performs a database query to retrieve the largest FMID value.
+    @raises: None
+    @returns: Maximum FMID value or zero if the table is empty.
+    '''
     select_max_fmid_query = """
     SELECT MAX(FMID) FROM markets;
     """
@@ -302,6 +390,14 @@ def find_max_fmid():
 
 # Логика обработки файла Export.csv
 def process_export_csv(filename):
+    '''
+    Process the export CSV file, extracting and inserting market-related data into the database.
+    @requires: filename ϵ string
+    @modifies: Database tables are populated with market data.
+    @effects: Reads the CSV file, processes each line, extracts and normalizes data before insertion.
+    @raises: None
+    @returns: None
+    '''
     markets_with_fmid = []  # Рынки с установленным FMID
     markets_without_fmid = []  # Рынки без установленного FMID
 
@@ -332,6 +428,14 @@ def process_export_csv(filename):
 
 # Основной обработчик рынка
 def handle_market(row):
+    '''
+    Handle processing of a single market record, preparing and inserting data into appropriate tables.
+    @requires: row ϵ dict
+    @modifies: Database tables are populated with processed market data.
+    @effects: Processes and inserts address, coordinates, schedules, products, payments, and social links for a market.
+    @raises: None
+    @returns: None
+    '''
     # Начнём с адреса
     address_id = insert_address({
         'street': row.pop('street'),
@@ -470,6 +574,14 @@ def handle_market(row):
 
 # Логика обработки всех файлов
 def process_csv_file(filename):
+    '''
+    Process different types of CSV files and populate the database accordingly.
+    @requires: filename ϵ string
+    @modifies: Database tables are populated with data from CSV files.
+    @effects: Handles different types of CSV files (export, users, reviews) and calls respective handlers.
+    @raises: None
+    @returns: None
+    '''
     if filename.endswith('Export.csv'):       # Сначала обрабатываем рынки
         process_export_csv(filename)
     elif filename.endswith('users.csv'):      # Потом добавляем пользователей
