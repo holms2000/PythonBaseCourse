@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from tkinter.messagebox import showerror, showwarning, showinfo
 import psycopg2
 from contextlib import closing
 import math
@@ -23,6 +24,32 @@ db_config = {
 
 # Радиус Земли в милях
 EARTH_RADIUS_MILES = 3958.8
+           # Функция для создания модального предупреждения
+def show_modal_warning(parent, title, message):
+       modal_win = tk.Toplevel(parent)
+       modal_win.title(title)
+       modal_win.transient(parent)  # Делаем дочерним окном текущего окна
+       modal_win.grab_set()  # Захватываем фокус
+
+       # Центрирование окна относительно родителя
+       parent_width = parent.winfo_width()
+       parent_height = parent.winfo_height()
+       window_width = 300
+       window_height = 150
+       pos_x = parent.winfo_rootx() + (parent_width // 2) - (window_width // 2)
+       pos_y = parent.winfo_rooty() + (parent_height // 2) - (window_height // 2)
+       modal_win.geometry(f"{window_width}x{window_height}+{pos_x}+{pos_y}")
+
+       # Элемент Label для отображения текста
+       warning_label = ttk.Label(modal_win, text=message, font=("Helvetica", 12))
+       warning_label.pack(pady=20)
+
+       # Кнопка OK для закрытия окна
+       ok_button = ttk.Button(modal_win, text="OK", command=modal_win.destroy)
+       ok_button.pack(pady=10)
+
+       # Ждем закрытия окна
+       modal_win.wait_window()
 
 # Класс для работы с базой данных
 class DatabaseConnection:
@@ -162,7 +189,26 @@ class MarketManager:
     def __init__(self, db_connector):
         self.db_connector = db_connector
 
+    def calculate_average_rating(self, fmid):
+        # Запрос для получения среднего рейтинга конкретного рынка
+        query = "SELECT COALESCE(AVG(rating), 0) AS avg_rating FROM reviews WHERE fmid=%s;"
+        result = self.db_connector.execute_query(query, (fmid,))
+        return result[0][0] if result else 0
+
     def find_market_by_criteria(self, **kwargs):
+        # Основной запрос на получение списков рынков по критериям
+        markets = self.base_find_market_by_criteria(**kwargs)
+
+        # Вычисление среднего рейтинга для каждого рынка
+        '''
+        for market in markets:
+            average_rating = self.calculate_average_rating(market['FMID'])
+            market['average_rating'] = average_rating
+        '''
+        return markets
+
+    def base_find_market_by_criteria(self, **kwargs):
+        # Базовый метод поиска, аналогичный вашему оригинальному запросу
         conditions = []
         args = []
         if kwargs.get('city'):
@@ -194,11 +240,15 @@ class MarketManager:
             query += " WHERE " + " AND ".join(conditions)
         results = self.db_connector.execute_query(query, args)
         return [dict(zip(('id', 'FMID', 'MarketName', 'website', 'address_id', 'coordinate_id', 'update_time', 'street', 'city', 'county', 'state', 'zip', 'latitude', 'longitude'), row)) for row in results]
-
-    def sort_markets(self, markets, field, reverse=False):
-        sorted_markets = sorted(markets, key=lambda x: x[field], reverse=reverse)
-        return sorted_markets
-
+    
+    def sort_markets(self, markets, field, order="desc"):
+       if field == 'rating':
+            # Замещение None на 0 для правильного сравнения
+            sorted_markets = sorted(markets, key=lambda x: x['average_rating'] or 0, reverse=(order != "asc"))
+       else:
+            sorted_markets = sorted(markets, key=lambda x: x[field], reverse=(order != "asc"))
+       return sorted_markets
+        
     def paginate_results(self, markets):
         PAGE_SIZE = 10
         pages = []
@@ -208,6 +258,7 @@ class MarketManager:
             end = start + PAGE_SIZE
             pages.append(markets[start:end])
         return pages
+    
     def show_details(self, fmid_or_name, review_manager, logged_in_user):
         try:
             fmid = int(fmid_or_name)
@@ -247,9 +298,11 @@ class MarketManager:
         product_result = self.db_connector.execute_query(product_query, (market["id"],))
         products = []
         product_columns = ['organic', 'baked_goods', 'cheese', 'crafts', 'flowers', 'eggs', 'seafood', 'herbs', 'vegetables', 'honey', 'jams', 'maple', 'meat', 'nursery', 'nuts', 'plants', 'poultry', 'prepared', 'soap', 'trees', 'wine', 'coffee', 'beans', 'fruits', 'grains', 'juices', 'mushrooms', 'pet_food', 'tofu', 'wild_harvested']
+        
         for col, val in zip(product_columns, product_result[0]):
            if val:
              products.append(col.replace("_", " ").capitalize())
+        
         '''
         if product_result:
             pr = product_result[0]
@@ -563,7 +616,11 @@ class FarmersMarketsApp(tk.Tk):
         self.tab_add_review = ttk.Frame(self.tab_control)
         self.tab_control.add(self.tab_view_all, text="Просмотр рынков")
         self.tab_control.add(self.tab_search, text="Поиск рынков")
-        self.tab_control.add(self.tab_add_review, text="Добавить отзыв")
+        #self.tab_control.add(self.tab_add_review, text="Добавить отзыв")
+        
+        # Важно вызвать метод установки вкладки ДО добавления вкладочной панели
+        self.setup_add_review_tab()
+
         self.tab_control.pack(expand=True, fill="both")
         
         # Кнопка для загрузки всех рынков
@@ -584,6 +641,7 @@ class FarmersMarketsApp(tk.Tk):
         self.tree_view_all.bind('<Double-Button-1>', self.on_row_double_click)
 
         # Вкладка поиска рынков
+        '''
         label_search_city = ttk.Label(self.tab_search, text="Город:", font=("Arial", 14))
         label_search_city.pack(pady=5)
         entry_search_city = ttk.Entry(self.tab_search, width=30)
@@ -596,7 +654,11 @@ class FarmersMarketsApp(tk.Tk):
         
         button_search = ttk.Button(self.tab_search, text="Искать", command=lambda: self.search_markets(entry_search_city.get(), entry_search_state.get()))
         button_search.pack(pady=10)
-
+        '''
+         # Вызов функции для поиска
+        button_search = ttk.Button(self.tab_search, text="Искать", command=self.open_search_dialog)
+        button_search.pack(pady=10)
+        
         # Таблица для результатов поиска
         self.tree_search = ttk.Treeview(self.tab_search, columns=("FMID", "Название", "Адрес"), show="headings")
         self.tree_search.heading("FMID", text="FMID")
@@ -611,6 +673,7 @@ class FarmersMarketsApp(tk.Tk):
         self.tree_search.bind('<Double-Button-1>', self.on_row_double_click)
 
         # Вкладка для добавления отзыва
+        '''
         label_add_review = ttk.Label(self.tab_add_review, text="Добавить отзыв", font=("Arial", 14))
         label_add_review.pack(pady=10)
         label_add_review_fmid = ttk.Label(self.tab_add_review, text="FMID рынка:", font=("Arial", 14))
@@ -630,6 +693,7 @@ class FarmersMarketsApp(tk.Tk):
 
         button_add_review = ttk.Button(self.tab_add_review, text="Отправить отзыв", command=lambda: self.add_review(entry_add_review_fmid.get(), entry_add_review_rating.get(), entry_add_review_comment.get()))
         button_add_review.pack(pady=10)
+        ''' 
 
     def load_all_markets(self):
         markets = self.market_mgr.find_market_by_criteria()
@@ -652,7 +716,8 @@ class FarmersMarketsApp(tk.Tk):
                 self.tree_search.insert("", "end", values=(market['FMID'], market['MarketName'], f"{market['street']}, {market['city']}, {market['state']}, {market['zip']}"))
         else:
             messagebox.showwarning("Предупреждение", "Рынков не найдено.")
-
+            
+    
     def add_review(self, fmid, rating, comment):
         if not self.logged_in_user:
             messagebox.showwarning("Предупреждение", "Необходимо войти в систему.")
@@ -666,6 +731,227 @@ class FarmersMarketsApp(tk.Tk):
                 messagebox.showwarning("Предупреждение", "Рейтинг должен быть от 1 до 5.")
         except ValueError:
             messagebox.showwarning("Предупреждение", "Недопустимый формат рейтинга.")
+
+    def setup_add_review_tab(self):
+        # Установка вкладки "Добавить отзыв"
+        tab_add_review = ttk.Frame(self.tab_control)
+        self.tab_control.add(tab_add_review, text="Добавить отзыв")
+
+        # Кнопка поиска
+        button_search = ttk.Button(tab_add_review, text="Искать", command=self.open_search_dialog_from_add_review)
+        button_search.pack(pady=10)
+
+        # Таблица для отображения результатов поиска
+        self.tree_search_results = ttk.Treeview(tab_add_review, columns=("FMID", "Название", "Адрес"), show="headings")
+        self.tree_search_results.heading("FMID", text="FMID")
+        self.tree_search_results.heading("Название", text="Название")
+        self.tree_search_results.heading("Адрес", text="Адрес")
+        self.tree_search_results.pack(side="top", fill="both", expand=True)
+
+        # Привязываем событие double-click к методу перехода в подробности
+        self.tree_search_results.bind('<Double-Button-1>', self.on_row_double_click)
+
+    def open_search_dialog_from_add_review(self):
+       # Диалоговое окно для выбора режима поиска
+       dialog = tk.Toplevel(self)
+       dialog.title("Выбор режима поиска")
+
+       # Радио-кнопки для выбора режима поиска
+       mode_choice = tk.IntVar()
+       mode_choice.set(1)  # Изначально выбрано FMID
+
+       fm_radio = ttk.Radiobutton(dialog, text="Поиск по FMID", variable=mode_choice, value=1)
+       fm_radio.pack(pady=5)
+
+       name_radio = ttk.Radiobutton(dialog, text="Поиск по части имени рынка", variable=mode_choice, value=2)
+       name_radio.pack(pady=5)
+
+       # Поле для ввода данных
+       entry_field = ttk.Entry(dialog, width=30)
+       entry_field.pack(pady=10)
+
+       # Кнопка поиска
+       button_search = ttk.Button(dialog, text="Искать", command=lambda: self.perform_search_from_add_review(mode_choice.get(), entry_field.get(), dialog))
+       button_search.pack(pady=10)    
+    
+    def perform_search_from_add_review(self, mode, search_term, dialog):
+       # Очищаем старые результаты
+       for child in self.tree_search_results.get_children():
+          self.tree_search_results.delete(child)
+
+       # Основываемся на выборе пользователя
+       if mode == 1:  # Поиск по FMID
+           markets = self.market_mgr.find_market_by_criteria(fmid=search_term)
+       elif mode == 2:  # Поиск по части имени рынка
+            markets = self.market_mgr.find_market_by_criteria(market_name_part=search_term)
+       else:
+             raise ValueError("Неподдержанный режим поиска!")
+
+       # Добавляем результаты в дерево
+       if markets:
+         for market in markets:
+            self.tree_search_results.insert("", "end", values=(market['FMID'], market['MarketName'], f"{market['street']}, {market['city']}, {market['state']}, {market['zip']}"))
+         dialog.destroy()  # Закрытие окна поиска
+       else:
+            #messagebox.showwarning("Предупреждение", "Рынков не найдено.")
+            #dialog.destroy()  # Закрытие окна поиска
+            self._no_results_label = ttk.Label(dialog, text="Рынков не найдено.", foreground="red")
+            self._no_results_label.pack(pady=5)
+
+    def perform_search(self, city, state, zip_code, latitude, longitude, max_distance, apply_sort, sort_order, dialog):
+       # Фильтрация параметров поиска
+       kwargs = {}
+       if city.strip(): kwargs['city'] = city
+       if state.strip(): kwargs['state'] = state
+       if zip_code.strip(): kwargs['zip_code'] = zip_code
+       if latitude.strip() and longitude.strip() and max_distance.strip():
+         kwargs['latitude'] = float(latitude)
+         kwargs['longitude'] = float(longitude)
+         kwargs['max_distance'] = float(max_distance)
+
+       # Первый этап поиска без расчёта среднего рейтинга
+       markets = self.market_mgr.find_market_by_criteria(**kwargs)
+       print(apply_sort)
+       print(sort_order.lower())
+       # Если включен флаг сортировки по рейтингу
+       if apply_sort:
+         # Теперь здесь производим расчет среднего рейтинга
+         for market in markets:
+             average_rating = self.market_mgr.calculate_average_rating(market['FMID'])
+             market['average_rating'] = average_rating
+
+         # Сортируем рынки по среднему рейтингу
+         markets = self.market_mgr.sort_markets(markets, 'rating', sort_order)
+
+       # Остальная логика вывода результатов остаётся прежней...
+       if markets:
+         # Очистим старую информацию
+         for item in self.tree_search.get_children():
+             self.tree_search.delete(item)
+
+         # Записываем новые результаты в TreeView
+         for market in markets:
+            self.tree_search.insert("", "end", values=(market['FMID'], market['MarketName'], f"{market['street']}, {market['city']}, {market['state']}, {market['zip']}"))
+
+         # Закрываем диалог поиска
+         dialog.destroy()
+       else:
+          # Если ничего не найдено, покажем предупреждение
+          no_results_label = ttk.Label(dialog, text="Рынков не найдено.", foreground="red")
+          no_results_label.pack(pady=5)
+    
+    def on_row_double_click(self, event):
+        # Обрабатываем выбор определенного рынка из результатов поиска
+        tree = event.widget
+        selected_item = tree.selection()[0]
+        fmid = tree.item(selected_item)['values'][0]
+        self.open_details_window(fmid)
+
+    def show_tooltip_message(self, message, duration_ms=2000):
+        tooltip = tk.Toplevel(self)
+        tooltip.overrideredirect(True)  # Без декораций и границы окна
+        tooltip.attributes('-alpha', 0.9)  # Немного прозрачный фон
+        tooltip.attributes('-topmost', True)  # Всегда сверху
+
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        tooltip_width = 200
+        tooltip_height = 50
+        x_pos = screen_width - tooltip_width - 10  # Позиция справа вверху
+        y_pos = 10
+        tooltip.geometry(f"{tooltip_width}x{tooltip_height}+{x_pos}+{y_pos}")
+
+        label = ttk.Label(tooltip, text=message, background="#ffffcc", relief="solid", padding=5)
+        label.pack()
+
+        # Автоматически закрываем окно после указанного времени
+        tooltip.after(duration_ms, tooltip.destroy)
+
+    def open_search_dialog(self):
+       # Окно поиска
+       dialog = tk.Toplevel(self)
+       dialog.title("Критерии поиска")
+
+       # Город
+       label_city = ttk.Label(dialog, text="Город:", font=("Arial", 14))
+       label_city.pack(pady=5)
+       entry_city = ttk.Entry(dialog, width=30)
+       entry_city.pack(pady=5)
+
+       # Штат
+       label_state = ttk.Label(dialog, text="Штат:", font=("Arial", 14))
+       label_state.pack(pady=5)
+       entry_state = ttk.Entry(dialog, width=30)
+       entry_state.pack(pady=5)
+
+       # Индекс
+       label_zip = ttk.Label(dialog, text="Индекс (необязательно):", font=("Arial", 14))
+       label_zip.pack(pady=5)
+       entry_zip = ttk.Entry(dialog, width=30)
+       entry_zip.pack(pady=5)
+
+       # Широта
+       label_lat = ttk.Label(dialog, text="Широта для расчета расстояния (необязательно):", font=("Arial", 14))
+       label_lat.pack(pady=5)
+       entry_lat = ttk.Entry(dialog, width=30)
+       entry_lat.pack(pady=5)
+
+       # Долгота
+       label_lon = ttk.Label(dialog, text="Долгота для расчета расстояния (необязательно):", font=("Arial", 14))
+       label_lon.pack(pady=5)
+       entry_lon = ttk.Entry(dialog, width=30)
+       entry_lon.pack(pady=5)
+       
+       # Инициализируем виджет для дистанции вне области видимости
+       self.entry_dist = None
+
+       # Проверка наличия координат перед добавлением поля максимальных расстояний
+       '''
+       def validate_and_show_max_distance():
+          lat_value = entry_lat.get().strip()
+          lon_value = entry_lon.get().strip()
+          if lat_value and lon_value:
+            # Только при наличии координат добавить поле
+            label_dist = ttk.Label(dialog, text="Максимальное расстояние (мили):", font=("Arial", 14))
+            label_dist.pack(pady=5)
+            entry_dist = ttk.Entry(dialog, width=30)
+            entry_dist.pack(pady=5)
+       '''
+       # Связываем обработку события изменения содержимого полей широты/долготы
+       '''
+       entry_lat.bind("<KeyRelease>", lambda e: validate_and_show_max_distance())
+       entry_lon.bind("<KeyRelease>", lambda e: validate_and_show_max_distance())
+       '''
+       # Расстояние
+       
+       label_dist = ttk.Label(dialog, text="Максимальное расстояние (мили):", font=("Arial", 14))
+       label_dist.pack(pady=5)
+       entry_dist = ttk.Entry(dialog, width=30)
+       entry_dist.pack(pady=5)
+       
+       # Применять сортировку?
+       var_apply_sort = tk.BooleanVar(value=False)
+       chk_apply_sort = ttk.Checkbutton(dialog, text="Применить сортировку по рейтингу?", variable=var_apply_sort)
+       chk_apply_sort.pack(pady=5)
+       
+       # Порядок сортировки
+       var_sort_order = tk.StringVar(value="desc")  # По умолчанию сортировка убывающая
+       chk_sort_asc = ttk.Checkbutton(dialog, text="Сортировать по возрастанию?", variable=var_sort_order, onvalue="asc", offvalue="desc")
+       chk_sort_asc.pack(pady=5)
+
+       # Кнопка для запуска поиска
+       button_search = ttk.Button(dialog, text="Искать", command=lambda: self.perform_search(
+        entry_city.get(),
+        entry_state.get(),
+        entry_zip.get(),
+        entry_lat.get(),
+        entry_lon.get(),
+        getattr(self.entry_dist, 'get', lambda : '')(),  # Используем getattr для безопасной обработки отсутствия поля
+        var_apply_sort.get(),
+        var_sort_order.get(),
+        dialog
+       ))
+       button_search.pack(pady=10)
 
 # Точка входа в приложение
 if __name__ == "__main__":
