@@ -10,11 +10,17 @@ from typing import List, Dict, Optional
 from functools import partial
 import os
 from dotenv import load_dotenv
+from pathlib import Path
+import sys
 
-load_dotenv()
+#сначала берем параметры базы из файла .env.example 
+env_path = os.path.join(sys.path[0], '.env.example')
 
+if load_dotenv(env_path)==False:
+   load_dotenv()
+   
 # Настройки подключения к базе данных
-'''
+
 #вариант с .env
 db_config = {
     'dbname': os.getenv("DBNAME"),
@@ -31,7 +37,7 @@ db_config = {
     'host': 'localhost',
     'port': '5433'
 }
-
+'''
 # Радиус Земли в милях
 EARTH_RADIUS_MILES = 3958.8
 
