@@ -16,11 +16,11 @@ EARTH_RADIUS_MILES = 3958.8  # Радиус Земли в милях
 '''
 вариант с .env
 db_config = {
-    'dbname': 'farmers_db',
+    'dbname': os.getenv("DBNAME"),
     'user': os.getenv("LOGIN"),
     'password':os.getenv("PASSWORD"),
-    'host': 'localhost',
-    'port': '5433'
+    'host': os.getenv("HOST"),
+    'port': os.getenv("PORT")
 }
 '''
 db_config = {
