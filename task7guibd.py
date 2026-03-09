@@ -51,6 +51,52 @@ def show_modal_warning(parent, title, message):
        # Ждем закрытия окна
        modal_win.wait_window()
 
+class Tooltip:
+    def __init__(self, widget, text, delay=500):
+        self.widget, self.text, self.delay = widget, text, delay
+        self._after_id = None
+        self._tip = None
+        widget.bind("<Enter>", self._schedule)
+        widget.bind("<Leave>", self._hide)
+        widget.bind("<ButtonPress>", self._hide)
+        widget.bind("<Motion>", self._move)
+
+    def _schedule(self, _=None):
+        self._cancel()
+        self._after_id = self.widget.after(self.delay, self._show)
+
+    def _show(self):
+        if self._tip:
+            return
+        self._tip = tk.Toplevel(self.widget)
+        self._tip.wm_overrideredirect(True)
+        self._tip.wm_attributes("-topmost", True)
+        tk.Label(self._tip, text=self.text, bg="#ffffe0",
+                 relief="solid", bd=1, justify="left").pack(ipadx=4, ipady=2)
+        self._move()
+
+    def _move(self, event=None):
+        if not self._tip:
+            return
+        x = (event.x_root + 12) if event else self.widget.winfo_rootx() + 12
+        y = (event.y_root + 8) if event else self.widget.winfo_rooty() + self.widget.winfo_height() + 4
+        self._tip.geometry(f"+{x}+{y}")
+
+    def _hide(self, _=None):
+        self._cancel()
+        if self._tip:
+            self._tip.destroy()
+            self._tip = None
+
+    def _cancel(self):
+        if self._after_id:
+            self.widget.after_cancel(self._after_id)
+            self._after_id = None
+
+# Example:
+# btn = ttk.Button(root, text="Hover me")
+# Tooltip(btn, "Click to submit", delay=700)
+
 # Класс для работы с базой данных
 class DatabaseConnection:
     def __init__(self, db_config):
@@ -361,7 +407,7 @@ class FarmersMarketsApp(tk.Tk):
     def __init__(self, db_connector):
         super().__init__()
         self.title("Приложение фермерских рынков")
-        self.geometry("800x600")
+        self.geometry("800x650")
         self.db_connector = db_connector
         self.user_mgr = UserManager(db_connector)
         self.review_mgr = ReviewManager(db_connector)
@@ -398,6 +444,7 @@ class FarmersMarketsApp(tk.Tk):
         if not self.logged_in_user:
             button_register = ttk.Button(login_frame, text="Зарегистрироваться", command=self.register_window)
             button_register.pack(padx=10, pady=10)
+            Tooltip(button_register, "Нажмите для регистрации в программе", delay=700)
 
     def authenticate(self, username, password):
        auth_result = self.user_mgr.verify_login(username, password)
@@ -469,7 +516,14 @@ class FarmersMarketsApp(tk.Tk):
         # Создаем новое окно
         self.details_window = tk.Toplevel(self)
         self.details_window.title("Подробности о рынке")
-        self.details_window.geometry("600x400")
+        self.details_window.geometry("800x600")
+        
+        # Убедимся, что окно полностью прорисовано перед захватом фокуса
+        self.details_window.update_idletasks()  # <<< Здесь обрабатываются все обновления GUI
+
+        # Блокируем взаимодействие с главным окном до закрытия модального окна
+        self.details_window.transient(self)   # Делаем дочерним окном основного окна
+        self.details_window.grab_set()        # Захватываем фокус на данное окно
 
         # Получаем детали выбранного рынка
         details = self.market_mgr.show_details(str(fmid), self.review_mgr, self.logged_in_user)
@@ -477,7 +531,12 @@ class FarmersMarketsApp(tk.Tk):
         # Выводим информацию о рынке в Text виджет
         text_area = tk.Text(self.details_window,height=5, wrap=tk.WORD)
         text_area.insert(tk.END, details)
+        #text_area.pack(fill="both", expand=True)
+        
         text_area.pack(fill="both", expand=True)
+        scrollbar_y = ttk.Scrollbar(text_area, orient="vertical", command=text_area.yview)
+        scrollbar_y.pack(side="right", fill="y")
+        text_area.configure(yscrollcommand=scrollbar_y.set)
 
         # Проверяем, оставил ли пользователь отзыв по этому рынку
         has_existing_review = self.review_mgr.user_has_reviewed(fmid, self.logged_in_user)
@@ -544,7 +603,15 @@ class FarmersMarketsApp(tk.Tk):
         # Обновляем окно перед захватом фокуса
         self.details_window.update_idletasks()
         self.details_window.grab_set()
+
+        # После завершения взаимодействия освобождаем захваченный фокус
+        self.details_window.protocol("WM_DELETE_WINDOW", self.on_close_details_window)
     
+    def on_close_details_window(self):
+        # Освобождаем фокус и закрываем окно
+        self.details_window.grab_release()
+        self.details_window.destroy()
+
     def send_new_review(self, fmid, rating, comment, text_area):
        # Этот метод вызывается только если пользователь еще не оставлял отзыв
        if not self.logged_in_user:
@@ -630,12 +697,17 @@ class FarmersMarketsApp(tk.Tk):
         # Таблица для всех рынков
         self.tree_view_all = ttk.Treeview(self.tab_view_all, columns=("FMID", "Название", "Адрес"), show="headings")
         self.tree_view_all.heading("FMID", text="FMID")
+        self.tree_view_all.column("FMID",minwidth=0,width=50)
         self.tree_view_all.heading("Название", text="Название")
+        self.tree_view_all.column("Название",minwidth=0,width=250)
         self.tree_view_all.heading("Адрес", text="Адрес")
+        self.tree_view_all.column("Адрес",minwidth=0,width=300)
         self.tree_view_all.pack(side="left", fill="both", expand=True)
         scrollbar_y = ttk.Scrollbar(self.tab_view_all, orient="vertical", command=self.tree_view_all.yview)
         scrollbar_y.pack(side="right", fill="y")
         self.tree_view_all.configure(yscrollcommand=scrollbar_y.set)
+        
+        Tooltip(self.tree_view_all, "Вход в подробности рынка, двойной клик на строке с рынком.", delay=700)
 
         # Обработчик двойного клика для таблицы всех рынков
         self.tree_view_all.bind('<Double-Button-1>', self.on_row_double_click)
@@ -662,12 +734,17 @@ class FarmersMarketsApp(tk.Tk):
         # Таблица для результатов поиска
         self.tree_search = ttk.Treeview(self.tab_search, columns=("FMID", "Название", "Адрес"), show="headings")
         self.tree_search.heading("FMID", text="FMID")
+        self.tree_search.column("FMID",minwidth=0,width=50)
         self.tree_search.heading("Название", text="Название")
+        self.tree_search.column("Название",minwidth=0,width=250)
         self.tree_search.heading("Адрес", text="Адрес")
+        self.tree_search.column("Адрес",minwidth=0,width=300)
         self.tree_search.pack(side="left", fill="both", expand=True)
         scrollbar_y_search = ttk.Scrollbar(self.tab_search, orient="vertical", command=self.tree_search.yview)
         scrollbar_y_search.pack(side="right", fill="y")
         self.tree_search.configure(yscrollcommand=scrollbar_y_search.set)
+        
+        Tooltip(self.tree_search, "Вход в подробности рынка, двойной клик на строке с рынком.", delay=700)
 
         # Обработчик двойного клика для таблицы поиска
         self.tree_search.bind('<Double-Button-1>', self.on_row_double_click)
@@ -744,9 +821,15 @@ class FarmersMarketsApp(tk.Tk):
         # Таблица для отображения результатов поиска
         self.tree_search_results = ttk.Treeview(tab_add_review, columns=("FMID", "Название", "Адрес"), show="headings")
         self.tree_search_results.heading("FMID", text="FMID")
+        self.tree_search_results.column("FMID",minwidth=0,width=50)
         self.tree_search_results.heading("Название", text="Название")
+        self.tree_search_results.column("Название",minwidth=0,width=250)
         self.tree_search_results.heading("Адрес", text="Адрес")
+        self.tree_search_results.column("Адрес",minwidth=0,width=300)
+        
         self.tree_search_results.pack(side="top", fill="both", expand=True)
+        
+        Tooltip(self.tree_search_results, "Вход в подробности рынка, двойной клик на строке с рынком.", delay=700)
 
         # Привязываем событие double-click к методу перехода в подробности
         self.tree_search_results.bind('<Double-Button-1>', self.on_row_double_click)
