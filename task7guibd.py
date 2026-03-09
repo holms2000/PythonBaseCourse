@@ -14,8 +14,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Настройки подключения к базе данных
-'''
-вариант с .env
+
+dotenv_path = '.env.example'
+load_dotenv(dotenv_path)
+#вариант с .env
 db_config = {
     'dbname': os.getenv("DBNAME"),
     'user': os.getenv("LOGIN"),
@@ -24,6 +26,7 @@ db_config = {
     'port': os.getenv("PORT")
 }
 '''
+#old 
 db_config = {
     'dbname': 'farmers_db',
     'user': 'sasha',
@@ -31,7 +34,7 @@ db_config = {
     'host': 'localhost',
     'port': '5433'
 }
-
+'''
 # Радиус Земли в милях
 EARTH_RADIUS_MILES = 3958.8
 
