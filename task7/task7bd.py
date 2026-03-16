@@ -7,14 +7,17 @@ from typing import List, Dict, Optional
 from functools import partial
 import os
 from dotenv import load_dotenv
-load_dotenv()
+import sys
 
-# Константы
-EARTH_RADIUS_MILES = 3958.8  # Радиус Земли в милях
+#сначала берем параметры базы из файла .env.example 
+env_path = os.path.join(sys.path[0], '.env.example')
 
-# Конфигурация подключения к базе данных
-'''
-вариант с .env
+if load_dotenv(env_path)==False:
+   load_dotenv()
+   
+# Настройки подключения к базе данных
+
+#вариант с .env
 db_config = {
     'dbname': os.getenv("DBNAME"),
     'user': os.getenv("LOGIN"),
@@ -30,6 +33,9 @@ db_config = {
     'host': 'localhost',
     'port': '5433'
 }
+'''
+# Константы
+EARTH_RADIUS_MILES = 3958.8  # Радиус Земли в милях
 
 # Класс для управления соединением с базой данных
 class DatabaseConnection:
