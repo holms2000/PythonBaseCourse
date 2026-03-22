@@ -235,8 +235,54 @@ class FarmersMarketsApp(tk.Tk):
               widget.destroy()
           self.logged_in_user = None
           self.logged_in_fullname = ""
-          self.login_window()
-    
+          self.destroy()
+          #self.login_window()
+
+    def find_market_for_review(self):
+        """Поиск рынка по названию или FMID для вкладки 'Добавить отзыв'."""
+        search_term = self.entry_search_market.get().strip()
+        
+        # Очистка таблицы перед вставкой новых данных
+        for child in self.tree_review_markets.get_children():
+            self.tree_review_markets.delete(child)
+
+        if not search_term:
+            messagebox.showwarning("Ошибка", "Введите название рынка или FMID.")
+            return
+
+        # Определяем параметры запроса на основе выбранной радиокнопки
+        mode = self.search_mode_var.get()
+        
+        if mode == 1: # Режим FMID выбран
+            try:
+                fmid_value = int(search_term)
+                params = {'fmid': fmid_value}
+                server_response = self.send_to_server('find_market_by_fmid', params)
+            except ValueError:
+                messagebox.showerror("Ошибка", "В режиме 'FMID' необходимо ввести число.")
+                return
+        else: # Режим Название выбран (mode == 2)
+            params = {'market_name_part': search_term}
+            server_response = self.send_to_server('find_market_by_name', params)
+        # Отправка запроса на сервер
+        #server_response = self.send_to_server('find_markets', params)
+        
+        if server_response.get('status') != 'ok':
+            messagebox.showerror("Ошибка сервера", server_response.get('message', "Неизвестная ошибка"))
+            return
+
+        markets = server_response.get('data', [])
+        
+        if not markets:
+            messagebox.showinfo("Результат", "Рынков не найдено.")
+            return
+
+        # Заполнение таблицы результатами
+        for market in markets:
+            fmid, name, street, city, state, zip_code = market[:6]
+            address_str = ", ".join([part for part in [street, city, state, zip_code] if part])
+            self.tree_review_markets.insert("", "end", values=(str(fmid), name or "", address_str or ""))
+
     # --- Основное приложение ---
     def main_app(self):
        welcome_label = ttk.Label(self, text=f"Добро пожаловать, {self.logged_in_fullname}!", font=("Arial", 16))
@@ -290,36 +336,37 @@ class FarmersMarketsApp(tk.Tk):
        search_frame_top = tk.Frame(self.tab_search)
        search_frame_top.pack(fill='x', padx=20, pady=(20, 5))
        
-       label_search_city = ttk.Label(search_frame_top, text="Город:", font=("Arial", 12))
-       label_search_city.grid(row=0, column=0, sticky='e')
+       #label_search_city = ttk.Label(search_frame_top, text="Город:", font=("Arial", 12))
+       #label_search_city.grid(row=0, column=0, sticky='e')
        
-       entry_search_city = ttk.Entry(search_frame_top, width=25)
-       entry_search_city.grid(row=0, column=1,padx=(5), sticky='w')
+       #entry_search_city = ttk.Entry(search_frame_top, width=25)
+       #entry_search_city.grid(row=0, column=1,padx=(5), sticky='w')
        
-       label_search_state = ttk.Label(search_frame_top, text="Штат:", font=("Arial", 12))
-       label_search_state.grid(row=0, column=2,sticky='e')
+       #label_search_state = ttk.Label(search_frame_top, text="Штат:", font=("Arial", 12))
+       #label_search_state.grid(row=0, column=2,sticky='e')
        
-       entry_search_state = ttk.Entry(search_frame_top, width=25)
-       entry_search_state.grid(row=0, column=3,padx=(5), sticky='w')
+       #entry_search_state = ttk.Entry(search_frame_top, width=25)
+       #entry_search_state.grid(row=0, column=3,padx=(5), sticky='w')
+       
          
        button_advanced_search = ttk.Button(search_frame_top,
                                              text="Расширенный поиск",
                                              command=self.open_search_dialog)
        button_advanced_search.grid(row=0, column=4,padx=(20), sticky='e')
-         
+       '''  
        button_search_simple = ttk.Button(search_frame_top,
                                            text="Искать",
                                            command=lambda: self.search_markets(
                                                city=entry_search_city.get(),
                                                state=entry_search_state.get()))
        button_search_simple.grid(row=0, column=5,padx=(5), sticky='w')
-         
+       
        Tooltip(button_advanced_search,
                  "Поиск по индексу или координатам.", delay=700)
          
        Tooltip(button_search_simple,
                  "Поиск по городу и штату.", delay=700)
-         
+       '''   
        columns_search = ("FMID", "Название", "Адрес")
        self.tree_search = ttk.Treeview(self.tab_search,
                                          columns=columns_search,
@@ -347,6 +394,66 @@ class FarmersMarketsApp(tk.Tk):
          
        Tooltip(self.tree_search,
                  "Двойной клик для просмотра подробностей.", delay=700)
+       
+       # --- Вкладка "Добавить отзыв" ---
+       self.tab_add_review = ttk.Frame(self.tab_control)
+       self.tab_control.add(self.tab_add_review, text="Добавить отзыв")
+
+       '''
+       # Фрейм для поиска рынка
+       frame_search = tk.Frame(self.tab_add_review)
+       frame_search.pack(fill='x', padx=10, pady=10)
+
+       ttk.Label(frame_search, text="Найти рынок по названию или FMID:").pack(side='left')
+        
+        # Сохраняем ссылку на Entry как атрибут класса, чтобы к ней был доступ
+       self.entry_search_market = ttk.Entry(frame_search, width=30)
+       self.entry_search_market.pack(side='left', padx=5)
+       '''
+       # Фрейм для строки поиска с радио-кнопками
+       frame_search = tk.Frame(self.tab_add_review)
+       frame_search.pack(fill='x', padx=10, pady=10)
+
+        # 1. Переменная для хранения выбранного режима (1 - FMID, 2 - Название)
+       self.search_mode_var = tk.IntVar(value=1) # По умолчанию FMID
+
+        # 2. Радиокнопки
+       rb_fmid = ttk.Radiobutton(frame_search, text="FMID", variable=self.search_mode_var, value=1)
+       rb_fmid.pack(side="left", padx=(0, 5))
+
+       rb_name = ttk.Radiobutton(frame_search, text="Название", variable=self.search_mode_var, value=2)
+       rb_name.pack(side="left", padx=(5, 10))
+
+        # 3. Поле ввода
+       self.entry_search_market = ttk.Entry(frame_search, width=25)
+       self.entry_search_market.pack(side="left", fill='x', expand=True, padx=(0, 10))
+ 
+       # Кнопка вызывает метод поиска
+       ttk.Button(frame_search, text="Найти", command=self.find_market_for_review).pack(side='left')
+
+        # --- Блок с таблицей результатов ---
+       frame_tree = tk.Frame(self.tab_add_review)
+       frame_tree.pack(fill='both', expand=True, padx=10)
+
+       self.tree_review_markets = ttk.Treeview(frame_tree, 
+                                                columns=("FMID", "Название", "Адрес"), 
+                                                show="headings")
+       self.tree_review_markets.heading("FMID", text="FMID")
+       self.tree_review_markets.column("FMID", width=60, minwidth=40)
+       self.tree_review_markets.heading("Название", text="Название")
+       self.tree_review_markets.column("Название", width=250, minwidth=40)
+       self.tree_review_markets.heading("Адрес", text="Адрес")
+       self.tree_review_markets.column("Адрес", width=350, minwidth=40)
+        
+       # Добавляем скроллбар
+       scrollbar_y = ttk.Scrollbar(frame_tree, orient="vertical", command=self.tree_review_markets.yview)
+       scrollbar_y.pack(side="right", fill="y")
+       self.tree_review_markets.configure(yscrollcommand=scrollbar_y.set)
+        
+       self.tree_review_markets.pack(side="left", fill="both", expand=True)
+
+        # Привязываем двойной клик к открытию окна деталей
+       self.tree_review_markets.bind('<Double-1>', self.on_row_double_click)
     
     # --- Логика работы с данными ---
     
@@ -441,7 +548,7 @@ class FarmersMarketsApp(tk.Tk):
        """Диалог для расширенного поиска."""
        dialog = tk.Toplevel(self)
        dialog.title("Расширенный поиск")
-       dialog.geometry("450x380")
+       dialog.geometry("500x380")
        dialog.resizable(False, False)
        
        frame_main = tk.Frame(dialog,padx=20,pady=(20))
@@ -449,34 +556,34 @@ class FarmersMarketsApp(tk.Tk):
        
        # Поля ввода
        label_city_dlg = ttk.Label(frame_main,text="Город:")
-       label_city_dlg.grid(row=0,sticky='e')
+       label_city_dlg.grid(row=0,sticky='w')
        entry_city_dlg = ttk.Entry(frame_main,width=35)
-       entry_city_dlg.grid(row=0,rowspan=2,padx=(5),sticky='w')
+       entry_city_dlg.grid(row=0,column=1,padx=(5),sticky='e')
        
        label_state_dlg = ttk.Label(frame_main,text="Штат:")
-       label_state_dlg.grid(row=2,sticky='e')
+       label_state_dlg.grid(row=2,sticky='w')
        entry_state_dlg = ttk.Entry(frame_main,width=35)
-       entry_state_dlg.grid(row=2,rowspan=2,padx=(5),sticky='w')
+       entry_state_dlg.grid(row=2,column=1,padx=(5),sticky='e')
        
        label_zip_dlg = ttk.Label(frame_main,text="Индекс (ZIP):")
-       label_zip_dlg.grid(row=4,sticky='e')
+       label_zip_dlg.grid(row=4,sticky='w')
        entry_zip_dlg = ttk.Entry(frame_main,width=35)
-       entry_zip_dlg.grid(row=4,rowspan=2,padx=(5),sticky='w')
+       entry_zip_dlg.grid(row=4,column=1,padx=(5),sticky='e')
        
        label_lat_dlg = ttk.Label(frame_main,text="Широта:")
-       label_lat_dlg.grid(row=6,sticky='e')
+       label_lat_dlg.grid(row=6,sticky='w')
        entry_lat_dlg = ttk.Entry(frame_main,width=35)
-       entry_lat_dlg.grid(row=6,rowspan=2,padx=(5),sticky='w')
+       entry_lat_dlg.grid(row=6,column=1,padx=(5),sticky='e')
        
        label_lon_dlg = ttk.Label(frame_main,text="Долгота:")
-       label_lon_dlg.grid(row=8,sticky='e')
+       label_lon_dlg.grid(row=8,sticky='w')
        entry_lon_dlg = ttk.Entry(frame_main,width=35)
-       entry_lon_dlg.grid(row=8,rowspan=2,padx=(5),sticky='w')
+       entry_lon_dlg.grid(row=8,column=1,padx=(5),sticky='e')
        
        label_dist_dlg = ttk.Label(frame_main,text="Макс. расстояние (мили):")
-       label_dist_dlg.grid(row=10,sticky='e')
+       label_dist_dlg.grid(row=10,sticky='w')
        entry_dist_dlg = ttk.Entry(frame_main,width=35)
-       entry_dist_dlg.grid(row=10,rowspan=2,padx=(5),sticky='w')
+       entry_dist_dlg.grid(row=10,column=1,padx=(5),sticky='e')
        
        # Сортировка
        frame_sort = tk.Frame(frame_main)
@@ -510,6 +617,21 @@ class FarmersMarketsApp(tk.Tk):
 
        btn_cancel = ttk.Button(frame_btns, text="Отмена", command=dialog.destroy)
        btn_cancel.pack(side="right")
+
+        # --- Фрейм для текстового сообщения (под кнопками) ---
+       self.frame_message = tk.Frame(dialog)
+       self.frame_message.pack(fill='x', padx=40) # Располагаем под кнопками
+
+       self.label_search_result = tk.Label(
+        self.frame_message,
+        text="Рынков не найдено.",
+        foreground="red",
+        font=("Arial", 12),
+        justify="center"
+        )
+       # Изначально скрываем и сам фрейм, и лейбл внутри него
+       self.label_search_result.pack_forget()
+       self.frame_message.pack_forget()
     
     def perform_search(self, city, state, zip_code, latitude, longitude, max_distance,
                        apply_sort, sort_order, dialog, tree_to_fill):
@@ -552,9 +674,26 @@ class FarmersMarketsApp(tk.Tk):
             tree_to_fill.insert("", "end", values=(str(fmid), name or "", address_str or ""))
             
         if not markets:
-            messagebox.showwarning("Предупреждение", "Рынков не найдено.")
-            
-        dialog.destroy()
+          # Если рынков нет:
+        
+          # 1. Показываем текстовое сообщение в его собственном фрейме
+          self.label_search_result.pack() # Показываем лейбл
+          self.frame_message.pack(pady=10) # Показываем контейнер для него
+        
+          # 2. Скрываем таблицу с результатами (она пустая)
+          #tree_to_fill.pack_forget()
+        
+        else:
+           # Если рынки найдены:
+        
+           # 1. Скрываем сообщение и его контейнер
+           self.label_search_result.pack_forget()
+           self.frame_message.pack_forget()
+        
+           # 2. Показываем таблицу с результатами
+           tree_to_fill.pack(side="left", fill="both", expand=True,padx=(20),pady=(5))
+           dialog.destroy()   
+        #dialog.destroy()
     
     def open_details_window(self, fmid):
         """Открывает модальное окно с подробной информацией о рынке."""
@@ -642,15 +781,32 @@ class FarmersMarketsApp(tk.Tk):
                 details_text += "Отзывов нет.\n"
 
         # --- Вывод текста в окно ---
+        '''
         text_area = tk.Text(self.details_window, wrap=tk.WORD)
         text_area.insert(tk.END, details_text)
-        
-        scrollbar_y = ttk.Scrollbar(self.details_window, orient="vertical", command=text_area.yview)
-        text_area.configure(yscrollcommand=scrollbar_y.set, state=tk.DISABLED) # Блокируем редактирование текста
-        
-        text_area.pack(side="left", fill="both", expand=True)
+               
+        text_area.pack(fill="both", expand=True)
+        scrollbar_y = ttk.Scrollbar(text_area, orient="vertical", command=text_area.yview)
         scrollbar_y.pack(side="right", fill="y")
-        
+        text_area.configure(yscrollcommand=scrollbar_y.set)
+        '''
+        # Создаем рамку (Frame), чтобы держать Text и Scrollbar вместе
+        details_frame = tk.Frame(self.details_window)
+        details_frame.pack(fill="both", expand=True)
+
+        # --- Вывод текста в окно ---
+        text_area = tk.Text(details_frame, wrap=tk.WORD)
+        text_area.insert(tk.END, details_text)
+
+        # Создаем скроллбар и связываем его с текстовым полем
+        scrollbar_y = ttk.Scrollbar(details_frame, orient="vertical", command=text_area.yview)
+        scrollbar_y.pack(side="right", fill="y")
+        text_area.configure(yscrollcommand=scrollbar_y.set)
+        text_area.pack(fill="both", expand=True, side="left")
+
+        # Сохраняем ссылки на виджеты в атрибуты самого окна
+        self.details_window.text_area = text_area
+        self.details_window.scrollbar_y = scrollbar_y
         # Сохраняем ссылку на text_area для обновления из других методов
         self.details_window.text_area = text_area 
 
@@ -752,7 +908,7 @@ class FarmersMarketsApp(tk.Tk):
                })
                
                if result.get('status') == 'ok':
-                   messagebox.showinfo("Успех", "Ваш отзыв успешно отправлен.")
+                   #messagebox.showinfo("Успех", "Ваш отзыв успешно отправлен.")
                    self.refresh_details_window(fmid)
                else:
                    messagebox.showerror("Ошибка", result.get('message'))
@@ -774,7 +930,7 @@ class FarmersMarketsApp(tk.Tk):
                })
                
                if result.get('status') == 'ok':
-                   messagebox.showinfo("Успех", "Ваш отзыв успешно обновлён.")
+                   #messagebox.showinfo("Успех", "Ваш отзыв успешно обновлён.")
                    self.refresh_details_window(fmid)
                else:
                    messagebox.showerror("Ошибка", result.get('message'))
@@ -785,7 +941,7 @@ class FarmersMarketsApp(tk.Tk):
     
     def delete_review(self,fmid):
        """Удаление отзыва пользователя."""
-       answer = messagebox.askyesno("Подтверждение", "Вы действительно хотите удалить этот отзыв?")
+       answer =True #messagebox.askyesno("Подтверждение", "Вы действительно хотите удалить этот отзыв?")
        if answer:
            result = self.send_to_server('remove_review', {
                'fmid': fmid,
@@ -793,23 +949,23 @@ class FarmersMarketsApp(tk.Tk):
            })
            
            if result.get('status') == 'ok':
-               messagebox.showinfo("Успех", "Ваш отзыв удален.")
+               #messagebox.showinfo("Успех", "Ваш отзыв удален.")
                self.refresh_details_window(fmid)
            else:
                messagebox.showerror("Ошибка", result.get('message'))
                
-    def refresh_details_window(self,fmid):
-       """Обновление содержимого окна деталей."""
-       if self.details_window is not None and hasattr(self.details_window,'text_area'):
-           # Удаляем старые виджеты
-           old_text_area = self.details_window.text_area
-           old_scrollbar = old_text_area.master.children['!scrollbar']
-           
-           old_text_area.destroy()
-           old_scrollbar.destroy()
-           
-           # Открываем окно заново с тем же FMID
-           self.open_details_window(fmid)
+    def refresh_details_window(self, fmid):
+       """Обновление содержимого окна деталей путем его полного пересоздания."""
+       # 1. Если окно существует, уничтожаем его полностью
+       if self.details_window is not None:
+         # Это корректно закроет окно и освободит все ресурсы
+         self.details_window.destroy() 
+    
+       # 2. Сбрасываем ссылку на None, чтобы метод open_details_window знал, что окна нет
+       self.details_window = None 
+
+       # 3. Открываем новое окно с обновленными данными
+       self.open_details_window(fmid)
 
 # Точка входа в приложение
 if __name__ == "__main__":

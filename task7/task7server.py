@@ -53,6 +53,10 @@ def handle_client(conn):
             with db_conn.cursor() as cursor:
                 if action == 'find_markets':
                     response = handle_find_markets(cursor, params)
+                elif action == 'find_market_by_name':
+                    response = handle_find_market_by_name(cursor, params)
+                elif action == 'find_market_by_fmid':
+                    response = handle_find_market_by_fmid(cursor, params)
                 elif action == 'get_market_details':
                     response = handle_get_market_details(cursor, params)
                 elif action == 'add_review':
@@ -140,7 +144,80 @@ def handle_find_markets(cursor, params):
     
     return {'status': 'ok', 'data': markets}
 
+# --- Поиск по части имени ---
+def handle_find_market_by_name(cursor, params):
+    """
+    Специализированный поиск рынков по части названия.
+    Не трогает основную функцию handle_find_markets.
+    """
+    # Используем тот же универсальный механизм поиска, но с конкретным параметром
+    conditions = []
+    args = []
 
+    # Только одно условие: поиск по названию
+    if params.get('market_name_part'):
+        conditions.append("markets.MarketName ILIKE %s")
+        args.append(f"%{params['market_name_part']}%")
+
+    # Если условий нет (например, параметр пустой), вернем пустой список
+    if not conditions:
+        return {'status': 'ok', 'data': []}
+
+    # Запрос строится аналогично основному, но без лишних JOIN и условий
+    query = """
+        SELECT markets.FMID, markets.MarketName,
+               addresses.street, addresses.city, addresses.state, addresses.zip,
+               (SELECT COALESCE(AVG(rating), 0) FROM reviews WHERE reviews.fmid = markets.FMID) as avg_rating
+          FROM markets
+          JOIN addresses ON markets.address_id=addresses.id
+          JOIN coordinates ON markets.coordinate_id=coordinates.id
+         WHERE """ + " AND ".join(conditions) + ";"
+    
+    cursor.execute(query, args)
+    rows = cursor.fetchall()
+    
+    markets = [row[:-1] for row in rows] # Убираем avg_rating из ответа
+
+    return {'status': 'ok', 'data': markets}
+
+# --- Поиск по FMID ---
+def handle_find_market_by_fmid(cursor, params):
+    """
+    Выполняет поиск рынка по точному совпадению FMID.
+    Эта функция не зависит от handle_find_markets.
+    """
+    fmid = params.get('fmid')
+    
+    # Если параметр не передан, возвращаем ошибку
+    if fmid is None:
+        return {'status': 'error', 'message': 'Параметр FMID обязателен.'}
+
+    # --- ИСПРАВЛЕНИЕ ТИПОВ ДАННЫХ ---
+    # Используем явное приведение типа, чтобы сравнивать строку со строкой.
+    # Это решает проблему, когда число сравнивается с текстовым полем.
+    query = """
+        SELECT markets.FMID, markets.MarketName,
+               addresses.street, addresses.city, addresses.state, addresses.zip,
+               (SELECT COALESCE(AVG(rating), 0) FROM reviews WHERE reviews.fmid = markets.FMID) as avg_rating
+          FROM markets
+          JOIN addresses ON markets.address_id=addresses.id
+         WHERE markets.FMID = (%s);
+    """
+    
+    try:
+        cursor.execute(query, (fmid,))
+        row = cursor.fetchone()
+        
+        if row:
+            # Убираем столбец avg_rating из результата перед отправкой клиенту
+            market_data = row[:-1]
+            return {'status': 'ok', 'data': [market_data]} # Оборачиваем в список для совместимости
+        else:
+            return {'status': 'ok', 'data': []} # Рынок не найден
+            
+    except Exception as e:
+        return {'status': 'error', 'message': f'Ошибка при поиске по FMID: {str(e)}'}
+    
 def handle_get_market_details(cursor, params):
     """Получение подробной информации о рынке."""
     fmid = params.get('fmid')
