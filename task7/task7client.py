@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 
 #сначала берем параметры базы из файла .env.example 
-env_path = os.path.join(sys.path[0], '.env.example1')
+env_path = os.path.join(sys.path[0], '.env.example')
 
 if load_dotenv(env_path)==False:
    load_dotenv()

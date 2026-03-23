@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import sys
 
 # --- Загрузка конфигурации ---
-env_path = os.path.join(sys.path[0], '.env.example1')
+env_path = os.path.join(sys.path[0], '.env.example')
 if not load_dotenv(env_path):
     load_dotenv()
 
