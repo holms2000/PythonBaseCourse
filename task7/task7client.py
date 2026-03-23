@@ -21,6 +21,20 @@ PORT = int(os.getenv("PORT_SERVER"))
 
 class Tooltip:
     def __init__(self, widget, text, delay=500):
+        '''
+        Initializes a Tooltip object for a given widget.
+
+        Binds mouse events to the widget to show and hide a floating label with the specified text.
+        The tooltip appears after a delay when the mouse enters the widget area.
+
+        @requires: widget — the Tkinter widget to attach the tooltip to;
+                   text — the string to display in the tooltip;
+                   delay — milliseconds before the tooltip appears (default: 500).
+        @modifies: Binds event handlers to the widget.
+        @effects: Displays a floating label near the widget on mouse hover.
+        @raises: None
+        @returns: None
+        '''
         self.widget, self.text, self.delay = widget, text, delay
         self._after_id = None
         self._tip = None
@@ -30,10 +44,32 @@ class Tooltip:
         widget.bind("<Motion>", self._move)
 
     def _schedule(self, _=None):
+        '''
+        Schedules the tooltip to be shown after a delay.
+
+        Cancels any existing schedule and sets a new timer to call _show().
+
+        @requires: None
+        @modifies: self._after_id
+        @effects: Starts a timer for showing the tooltip.
+        @raises: None
+        @returns: None
+        '''
         self._cancel()
         self._after_id = self.widget.after(self.delay, self._show)
 
     def _show(self):
+        '''
+        Creates and displays the tooltip window.
+
+        Creates a Toplevel window with a Label containing the tooltip text.
+
+        @requires: None
+        @modifies: self._tip (creates a new Toplevel window)
+        @effects: A floating window with text appears near the widget.
+        @raises: None
+        @returns: None
+        '''
         if self._tip:
             return
         self._tip = tk.Toplevel(self.widget)
@@ -44,6 +80,17 @@ class Tooltip:
         self._move()
 
     def _move(self, event=None):
+        '''
+        Positions the tooltip window near the cursor or widget.
+
+        Calculates the new coordinates for the tooltip based on mouse position or widget location.
+
+        @requires: event — Tkinter event object (optional).
+        @modifies: Geometry of self._tip window.
+        @effects: Moves the tooltip to follow the mouse or stay near the widget.
+        @raises: None
+        @returns: None
+        '''
         if not self._tip:
             return
         x = (event.x_root + 12) if event else self.widget.winfo_rootx() + 12
@@ -51,12 +98,34 @@ class Tooltip:
         self._tip.geometry(f"+{x}+{y}")
 
     def _hide(self, _=None):
+        '''
+        Hides and destroys the tooltip window.
+
+        Cancels any pending show timer and destroys the Toplevel window if it exists.
+
+        @requires: None
+        @modifies: self._tip (destroys window), self._after_id (cancels timer)
+        @effects: The tooltip is removed from the screen.
+        @raises: None
+        @returns: None
+        '''
         self._cancel()
         if self._tip:
             self._tip.destroy()
             self._tip = None
 
     def _cancel(self):
+        '''
+        Cancels a pending tooltip display timer.
+
+        Stops the scheduled call to _show() if it has not yet executed.
+
+        @requires: None
+        @modifies: self._after_id (resets to None)
+        @effects: Prevents the tooltip from being shown.
+        @raises: None
+        @returns: None
+        '''
         if self._after_id:
             self.widget.after_cancel(self._after_id)
             self._after_id = None
@@ -65,6 +134,18 @@ class Tooltip:
 
 class FarmersMarketsApp(tk.Tk):
     def __init__(self):
+        '''
+        Initializes the main application window and starts in login mode.
+
+        Sets up the window title, size, user state variables, and immediately displays the login screen.
+        This is the entry point for the GUI application.
+
+        @requires: None
+        @modifies: tk.Tk instance (window properties), application state variables.
+        @effects: Creates and displays the main application window with login screen.
+        @raises: None
+        @returns: None
+        '''
         super().__init__()
         self.title("Приложение фермерских рынков")
         self.geometry("800x650")
@@ -82,6 +163,20 @@ class FarmersMarketsApp(tk.Tk):
     # --- Методы взаимодействия с сервером ---
     def send_to_server(self, action, params):
         """Отправляет запрос на сервер и возвращает ответ."""
+        '''
+        Sends a request to the server and returns the response.
+
+        Constructs a JSON request with action and params,
+        establishes a TCP connection to HOST:PORT,
+        sends data, receives response in chunks until JSON is complete,
+        and handles connection errors and timeouts.
+
+        @requires: action — string defining server action; params — dictionary of parameters.
+        @modifies: Establishes network connection, sends/receives data.
+        @effects: Returns a dictionary with 'status' and 'message' or 'data'.
+        @raises: socket.error, ConnectionRefusedError, json.JSONDecodeError, socket.timeout.
+        @returns: dict — server response or error message.
+        '''
         request = {"action": action, "params": params}
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -133,6 +228,18 @@ class FarmersMarketsApp(tk.Tk):
         
     # --- Окно входа и регистрации ---
     def login_window(self):
+        '''
+        Displays the login window for user authentication.
+
+        Creates a frame with labels, entry fields for username/password,
+        and buttons for login and registration. Binds Enter key navigation.
+
+        @requires: User must not be logged in (self.logged_in_user is None).
+        @modifies: Main window interface (packs login frame).
+        @effects: Shows login form to user.
+        @raises: None.
+        @returns: None.
+        '''
         login_frame = tk.Frame(self)
         login_frame.pack(fill="both", expand=True)
 
@@ -158,6 +265,19 @@ class FarmersMarketsApp(tk.Tk):
         button_register.pack(padx=10, pady=10)
         
     def authenticate(self, username, password):
+       '''
+        Authenticates user credentials against the server.
+
+        Sends 'verify_login' action to server. On success,
+        sets user state variables and clears login screen to show main app.
+        On failure, shows an error message box.
+
+        @requires: username, password — strings entered by user.
+        @modifies: self.logged_in_user, self.logged_in_fullname, application interface.
+        @effects: Logs user in or shows error message.
+        @raises: No explicit exceptions; handles server errors via messagebox.
+        @returns: None.
+       '''
        auth_result = self.send_to_server('verify_login', {'username': username, 'password': password})
        
        if auth_result.get('status') == 'ok':
@@ -171,6 +291,18 @@ class FarmersMarketsApp(tk.Tk):
            messagebox.showerror("Ошибка сервера", auth_result.get('message'))
 
     def register_window(self):
+       '''
+        Displays the registration window for new users.
+    
+        Creates a frame with entry fields for first name, last name,
+        username, and password, along with a registration button.
+    
+        @requires: User must not be logged in.
+        @modifies: Main window interface (packs registration frame).
+        @effects: Shows registration form to user.
+        @raises: None.
+        @returns: None.
+       '''
        register_frame = tk.Frame(self)
        register_frame.pack(fill="both", expand=True)
 
@@ -199,6 +331,19 @@ class FarmersMarketsApp(tk.Tk):
        button_register.pack(padx=10, pady=10)
     
     def register_user(self, firstname, lastname, username, password):
+       '''
+       Registers a new user in the system via server request.
+    
+       Validates that all fields are non-empty,
+       checks if username exists on server,
+       then sends 'create_user' action if username is unique.
+    
+       @requires: firstname, lastname, username, password — non-empty strings.
+       @modifies: User database on server (if registration is successful).
+       @effects: Shows success or error message box regarding registration outcome.
+       @raises: No explicit exceptions; handles server errors via messagebox.
+       @returns: None.
+       '''
        if not firstname or not lastname or not username or not password:
            messagebox.showerror("Ошибка", "Все поля должны быть заполнены.")
            return
@@ -223,12 +368,35 @@ class FarmersMarketsApp(tk.Tk):
            messagebox.showerror("Ошибка сервера", create_result.get('message'))
     
     def clear_login_screen(self):
+       '''
+        Clears all widgets from the current window to prepare for main app view.
+    
+        Destroys all child widgets of the root window.
+    
+        @requires: Login or registration widgets are currently displayed.
+        @modifies: Main window interface (destroys all child widgets).
+        @effects: Prepares window for main_app() method call.
+        @raises: None.
+        @returns: None.
+       '''
        for widget in self.winfo_children():
            widget.destroy()
        self.main_app()
     
     def logout(self):
       """Сброс состояния пользователя и возврат к окну входа."""
+      '''
+      Logs out the current user and returns to login screen.
+    
+      Asks for confirmation via dialog. If confirmed,
+      resets user state variables and restarts application by destroying root window.
+    
+      @requires: User must be logged in (self.logged_in_user is not None).
+      @modifies: Application state variables and process (exits current instance).
+      @effects: User is logged out; new application instance starts at login screen.
+      @raises: None.
+      @returns: None.
+      '''
       result = messagebox.askyesno("Выход", "Вы уверены?")
       if result:
           for widget in self.winfo_children():
@@ -240,6 +408,19 @@ class FarmersMarketsApp(tk.Tk):
 
     def find_market_for_review(self):
         """Поиск рынка по названию или FMID для вкладки 'Добавить отзыв'."""
+        '''
+        Searches for a market by name or FMID for the 'Add Review' tab.
+
+        Clears previous search results, determines the search mode (FMID or name)
+        based on the selected radio button, and sends a request to the server.
+        Populates the review market table with the results.
+
+        @requires: A search term must be entered in self.entry_search_market.
+        @modifies: self.tree_review_markets (populates with search results).
+        @effects: Displays found markets for review selection.
+        @raises: ValueError if FMID is not a valid integer (handled internally).
+        @returns: None
+        '''
         search_term = self.entry_search_market.get().strip()
         
         # Очистка таблицы перед вставкой новых данных
@@ -285,6 +466,19 @@ class FarmersMarketsApp(tk.Tk):
 
     # --- Основное приложение ---
     def main_app(self):
+       '''
+       Initializes and displays the main application interface after successful login.
+   
+       Creates welcome label, logout button, and a tabbed notebook with three tabs:
+       "View All Markets", "Search Markets", and "Add Review".
+       Sets up tables and widgets for each tab's functionality.
+   
+       @requires: User must be authenticated (self.logged_in_user is set).
+       @modifies: Main window interface (packs all main app widgets).
+       @effects: Shows main application window with tabs and tables.
+       @raises: None.
+       @returns: None.
+       '''
        welcome_label = ttk.Label(self, text=f"Добро пожаловать, {self.logged_in_fullname}!", font=("Arial", 16))
        welcome_label.pack(pady=(20, 10))
        
@@ -459,6 +653,19 @@ class FarmersMarketsApp(tk.Tk):
     
     def on_row_double_click(self, event):
        """Обработчик двойного клика по строке в таблице."""
+       '''
+        Handles a double-click event on a row in any market table.
+
+        Retrieves the selected row's FMID value from the Treeview widget,
+        validates it as an integer, and then opens the details window for that market.
+
+        @requires: event — Tkinter event object from a double-click on a Treeview widget;
+                   event.widget must be one of the market tables (self.tree_view_all, self.tree_search, or self.tree_review_markets).
+        @modifies: May open self.details_window if the row selection is valid and FMID is an integer.
+        @effects: Opens the details window for the selected market or shows an error message if the selection is invalid or FMID format is incorrect.
+        @raises: ValueError if FMID cannot be converted to an integer (handled internally).
+        @returns: None
+       '''
        tree = event.widget
        selected_items = tree.selection()
        if not selected_items:
@@ -490,6 +697,18 @@ class FarmersMarketsApp(tk.Tk):
               print(f"Ошибка ValueError при попытке преобразовать '{fmid_str_val}' в int.")
     
     def load_all_markets(self):
+        '''
+        Loads and displays a list of all markets from the database into "View All Markets" table.
+   
+       Sends 'find_markets' action with empty params to server,
+       clears existing table rows, and inserts new rows for each market received.
+   
+       @requires: No input parameters; server must be reachable.
+       @modifies: self.tree_view_all table content.
+       @effects: Updates "View All Markets" table with data from server.
+       @raises: Handles server errors via messagebox.showwarning().
+       @returns: None.
+       '''
         markets_data = self.send_to_server('find_markets', {})
         
         if markets_data.get('status') != 'ok':
@@ -518,6 +737,19 @@ class FarmersMarketsApp(tk.Tk):
     
     def search_markets(self, city=None, state=None):
         """Простой поиск по городу и штату."""
+        '''
+        Searches for markets by city and/or state in "Search Markets" tab.
+   
+        Constructs params dictionary from non-empty city/state strings,
+        sends 'find_markets' action to server,
+        clears search table and populates it with results.
+   
+        @requires: city and/or state — strings (optional); server must be reachable.
+        @modifies: self.tree_search table content.
+        @effects: Updates "Search Markets" table with filtered results from server.
+        @raises: Handles server errors via messagebox.showwarning().
+        @returns: None.
+        '''
         params = {}
         if city: params['city'] = city.strip()
         if state: params['state'] = state.strip()
@@ -546,6 +778,19 @@ class FarmersMarketsApp(tk.Tk):
     
     def open_search_dialog(self):
        """Диалог для расширенного поиска."""
+       '''
+       Opens a dialog window for advanced market search by various criteria.
+  
+       Creates a Toplevel dialog with input fields for city, state, ZIP code,
+       latitude/longitude, max distance, sorting options,
+       and buttons to perform search or cancel/close dialog.
+  
+       @requires: No input parameters; user interaction required in dialog.
+       @modifies: Creates a new dialog window on screen.
+       @effects: Allows user to perform advanced search via dialog inputs.
+       @raises: Handles invalid numeric input via messagebox.showwarning().
+       @returns: None.
+       '''
        dialog = tk.Toplevel(self)
        dialog.title("Расширенный поиск")
        dialog.geometry("500x380")
@@ -636,6 +881,21 @@ class FarmersMarketsApp(tk.Tk):
     def perform_search(self, city, state, zip_code, latitude, longitude, max_distance,
                        apply_sort, sort_order, dialog, tree_to_fill):
         """Выполнение расширенного поиска."""
+        '''
+        Executes an advanced market search based on dialog inputs and fills target table.
+  
+        Validates numeric inputs (lat/long/distance), constructs params dict,
+        sends 'find_markets' action to server,
+        clears target table (tree_to_fill), populates it with results,
+        manages visibility of "no results" message frame within dialog,
+        and destroys dialog upon completion if markets are found.
+  
+        @requires: Search parameters from dialog; dialog window reference; target Treeview widget reference.
+        @modifies: tree_to_fill content; dialog window visibility/state; frame_message visibility in dialog.
+        @effects: Updates search results table based on advanced criteria; closes dialog on success if markets found.
+        @raises: ValueError if coordinates/distance are not valid numbers (handled internally).
+        @returns: None.
+        '''
         params = {}
         if city.strip(): params['city'] = city.strip()
         if state.strip(): params['state'] = state.strip()
@@ -697,6 +957,40 @@ class FarmersMarketsApp(tk.Tk):
     
     def open_details_window(self, fmid):
         """Открывает модальное окно с подробной информацией о рынке."""
+        '''
+        Opens a modal window with detailed information about the selected market.
+
+        This method retrieves comprehensive data for a specific market from the server
+        using its unique FMID. It constructs a formatted textual description including
+        the market's name, address, coordinates, social media links, payment options,
+        available products, and operating schedule.
+
+        The method then fetches all reviews associated with the market and appends them
+        to the description. The resulting text is displayed in a scrollable Text widget
+        within a new Toplevel window.
+
+        If the current user is authenticated, the method checks whether they have
+        already left a review for this market. If a review exists, a form for editing
+        or deleting it is displayed. Otherwise, a form for submitting a new review is shown.
+
+        The window is made modal to prevent interaction with the main application until closed.
+        It also prevents multiple instances of the details window for the same market.
+
+        @requires: fmid — a valid integer identifier of the market to display.
+                   The server must be reachable and respond to 'get_market_details' and 'get_reviews_by_fmid'.
+                   If the user is authenticated, 'user_has_reviewed' action is also used.
+        @modifies: Creates or updates self.details_window (a Toplevel widget).
+                   May modify the reviews database on the server if the user submits, edits, or deletes a review.
+                   Sets a custom protocol handler for the window's close event.
+        @effects: Displays a modal window with detailed market information and reviews.
+                  Allows authenticated users to manage their reviews (create, edit, delete).
+                  Updates the UI in the details window dynamically via refresh_details_window().
+                  Prevents opening multiple detail windows for the same market simultaneously.
+        @raises: Handles server errors via messagebox.showerror() if data retrieval fails.
+                 Handles invalid FMID or data format issues internally.
+                 Prevents multiple instances of the details window for the same FMID.
+        @returns: None
+        '''
         # Предотвращаем открытие нескольких окон
         if self.details_window is not None and self.details_window.winfo_exists():
             self.details_window.lift()
@@ -890,6 +1184,19 @@ class FarmersMarketsApp(tk.Tk):
     
     def on_close_details_window(self):
         """Освобождает фокус и закрывает окно деталей."""
+        '''
+        Releases the grab and closes the market details window.
+
+        This method is called when the user closes the details window.
+        It releases the modal state (grab) and destroys the window,
+        resetting the self.details_window reference to None.
+
+        @requires: self.details_window must exist and be open.
+        @modifies: self.details_window (destroys the window and sets to None).
+        @effects: Closes the modal details window and allows interaction with the main app.
+        @raises: None
+        @returns: None
+        '''
         if hasattr(self.details_window, 'grab_release'):
             self.details_window.grab_release()
         self.details_window.destroy()
@@ -897,6 +1204,23 @@ class FarmersMarketsApp(tk.Tk):
 
     def send_new_review(self,fmid,rating_str,comment_str):
        """Отправка нового отзыва на сервер."""
+       '''
+        Sends a new review for a specific market from an authenticated user.
+
+        Validates that rating is an integer between 1-5,
+        sends 'add_review' action to server with fmid/rating/comment/author data,
+        refreshes details window upon success to show new review in list;
+        shows appropriate warning/error messages otherwise.
+
+        @requires: fmid — integer market ID; rating_str — string convertible to int [1-5];
+                  comment_str — review text; user must be authenticated (self.logged_in_user).
+                  User must not have reviewed this market previously (checked by server).
+        @modifies: Reviews database on server; details window content via refresh_details_window().
+        @effects: Adds new review to database; updates UI in details window without recreating it entirely;
+                 shows warning/error messages for invalid input or server issues.
+        @raises: ValueError if rating cannot be converted to integer or out of range [1-5] (handled internally).
+        @returns: None
+        '''
        try:
            rating_value = int(rating_str)
            if 1 <= rating_value <= 5:
@@ -919,6 +1243,23 @@ class FarmersMarketsApp(tk.Tk):
     
     def save_review_changes(self,fmid,new_rating_str,new_comment_str):
        """Сохранение изменений в существующем отзыве."""
+       '''
+         Saves changes to an existing review by authenticated user for a specific market.
+         
+         Validates new rating as integer between 1-5,
+         sends 'edit_review' action to server with updated data,
+         refreshes details window upon success;
+         shows appropriate warning/error messages otherwise.
+         
+         @requires: fmid — integer market ID; new_rating_str — string convertible to int [1-5];
+                    new_comment_str — updated review text;
+                    user must be authenticated (self.logged_in_user) and must have reviewed this market previously (checked by server).
+         @modifies: Reviews database on server; details window content via refresh_details_window().
+         @effects: Updates existing review in database; updates UI in details window without recreating it entirely;
+                  shows warning/error messages for invalid input or server issues.
+         @raises: ValueError if rating cannot be converted to integer or out of range [1-5] (handled internally).
+         @returns: None
+         '''
        try:
            rating_value = int(new_rating_str)
            if 1 <= rating_value <= 5:
@@ -941,6 +1282,22 @@ class FarmersMarketsApp(tk.Tk):
     
     def delete_review(self,fmid):
        """Удаление отзыва пользователя."""
+       '''
+         Deletes an existing review by authenticated user for a specific market after confirmation.
+         
+         Sends confirmation dialog (currently always true),
+         sends 'remove_review' action to server with fmid/author data upon confirmation,
+         refreshes details window upon success;
+         shows appropriate error messages otherwise.
+         
+         @requires: fmid — integer market ID;
+                    user must be authenticated (self.logged_in_user) and must have reviewed this market previously (checked by server).
+         @modifies: Reviews database on server; details window content via refresh_details_window().
+         @effects: Removes review from database; updates UI in details window without recreating it entirely;
+                  shows error messages for server issues. Confirmation logic can be extended as needed.
+         @raises: No explicit exceptions raised by this method itself; handles confirmation internally (currently always true).
+         @returns: None
+       '''
        answer =True #messagebox.askyesno("Подтверждение", "Вы действительно хотите удалить этот отзыв?")
        if answer:
            result = self.send_to_server('remove_review', {
@@ -955,17 +1312,114 @@ class FarmersMarketsApp(tk.Tk):
                messagebox.showerror("Ошибка", result.get('message'))
                
     def refresh_details_window(self, fmid):
-       """Обновление содержимого окна деталей путем его полного пересоздания."""
-       # 1. Если окно существует, уничтожаем его полностью
-       if self.details_window is not None:
-         # Это корректно закроет окно и освободит все ресурсы
-         self.details_window.destroy() 
-    
-       # 2. Сбрасываем ссылку на None, чтобы метод open_details_window знал, что окна нет
-       self.details_window = None 
+       """
+        Обновляет ТОЛЬКО текстовое поле с данными о рынке и отзывами.
+        Форма для отправки отзыва НЕ перерисовывается.
+       """
+       '''
+          Refreshes only content of an existing market details window without closing it or recreating widgets/form frames.
+          
+          Retrieves up-to-date market details/reviews from server via get_market_details/get_reviews_by_fmid,
+          rebuilds textual description string,
+          clears existing text in self.details_window.text_area,
+          inserts updated text into text area widget.
+          Does not redraw review form widgets.
+          
+          @requires: fmid — market identifier; self.details_window must exist and be open.
+          @modifies: Text content of self.details_window.text_area widget only.
+          @effects: Updates displayed market information and reviews to latest state from server.
+          @raises: No explicit exceptions; silently returns if window does not exist or was closed.
+          @returns: None
+       '''
+       # Проверяем, что окно существует и не было закрыто
+       if not self.details_window or not self.details_window.winfo_exists():
+         return
 
-       # 3. Открываем новое окно с обновленными данными
-       self.open_details_window(fmid)
+       # Получаем обновленные данные с сервера
+       details_data = self.send_to_server('get_market_details', {'fmid': fmid})
+    
+       if details_data.get('status') != 'ok':
+         # Если ошибка, выводим сообщение, но окно не закрываем
+         messagebox.showerror("Ошибка", details_data.get('message'))
+         return
+
+       data = details_data['data']
+    
+       # Собираем новое описание в строку
+       details_text = ""
+    
+       # 1. Основная информация
+       market_info = data.get('market', [])
+       address_info = data.get('address', [])
+    
+       if market_info and address_info:
+        details_text += f"Название: {market_info[2]}\n"
+        
+        street = address_info[1] or ""
+        city_state_zip = f"{address_info[2]}, {address_info[3]} {address_info[4]}" if address_info[2] and address_info[3] else ""
+        details_text += f"Адрес: {street} {city_state_zip}\n"
+        
+        coords_info = data.get('coords', [])
+        if coords_info:
+            details_text += f"Координаты: {coords_info[1]}, {coords_info[2]}\n"
+
+       # 2. Социальные сети
+       social_links = data.get('social', {})
+       if social_links:
+        details_text += "\n--- СОЦИАЛЬНЫЕ СЕТИ ---\n"
+        for platform, link in social_links.items():
+            if link:
+                details_text += f"{platform}: {link}\n"
+
+       # 3. Способы оплаты
+       payment_options = data.get('payment', {})
+       if payment_options:
+        details_text += "\n--- СПОСОБЫ ОПЛАТЫ ---\n"
+        for option, available in payment_options.items():
+            details_text += f"{option}: {'Да' if available else 'Нет'}\n"
+
+       # 4. Продукты
+       products_list = data.get('products', [])
+       if products_list:
+        details_text += "\n--- ПРОДУКТЫ НА РЫНКЕ ---\n"
+        details_text += ", ".join(products_list) + "\n"
+
+       # 5. График работы
+       schedule_list = data.get('schedule', [])
+       if schedule_list:
+        details_text += "\n--- ГРАФИК РАБОТЫ ---\n"
+        for sched in schedule_list:
+            # Используем .get() для защиты от KeyError, если структура данных изменится
+            season_num = sched.get('Season Number', '')
+            season_date = sched.get('Season Date', '')
+            season_time = sched.get('Season Time', '')
+            details_text += f"Сезон {season_num}: {season_date}, Время: {season_time}\n"
+    
+       # 6. Отзывы (самая динамичная часть)
+       reviews_data = self.send_to_server('get_reviews_by_fmid', {'fmid': fmid})
+       details_text += "\n--- ОТЗЫВЫ ---\n"
+    
+       if reviews_data.get('status') == 'ok':
+        reviews_list = reviews_data.get('data', [])
+        if reviews_list:
+            for rev in reviews_list:
+                # Используем .get() для защиты от ошибок
+                author_name = rev.get('fullname') or rev.get('author') or 'Аноним'
+                rating = rev.get('rating', 'N/A')
+                comment = rev.get('comment', '')
+                details_text += f"Автор: {author_name}, Рейтинг: {rating}\n"
+                details_text += f"Комментарий: {comment}\n\n"
+        else:
+            details_text += "Отзывов нет.\n"
+
+       # --- Обновляем ТОЛЬКО текстовое поле ---
+
+       # Находим виджет Text внутри окна (ссылка на него сохраняется при создании окна)
+       text_area = self.details_window.text_area
+    
+       # Очищаем старое содержимое и вставляем новое
+       text_area.delete(1.0, tk.END)
+       text_area.insert(tk.END, details_text)
 
 # Точка входа в приложение
 if __name__ == "__main__":

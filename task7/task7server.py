@@ -27,6 +27,14 @@ def handle_client(conn):
     """
     Обрабатывает входящее соединение.
     Читает JSON-запрос, выполняет действие и отправляет JSON-ответ.
+    
+    Handles an incoming client connection.
+
+    @requires: A valid socket connection `conn`.
+    @modifies: The database state (if the action requires writing), the socket connection.
+    @effects: Sends a JSON response to the client. Closes the connection.
+    @raises: Exceptions on JSON parsing errors or database connection failures.
+    @returns: None
     """
     # Ответ по умолчанию на случай непредвиденных ошибок
     response = {'status': 'error', 'message': 'Неизвестная ошибка на сервере.'}
@@ -95,6 +103,15 @@ def handle_client(conn):
 
 def handle_find_markets(cursor, params):
     """Поиск рынков по различным критериям."""
+    """
+    Searches for markets based on various criteria.
+
+    @requires: A valid database cursor and a dictionary of filter parameters.
+    @modifies: None (read-only operation).
+    @effects: Executes an SQL query against the database.
+    @raises: Exceptions on SQL execution errors.
+    @returns: A dictionary with status and a list of found markets.
+    """
     conditions = []
     args = []
 
@@ -150,6 +167,15 @@ def handle_find_market_by_name(cursor, params):
     Специализированный поиск рынков по части названия.
     Не трогает основную функцию handle_find_markets.
     """
+    """
+    Searches for markets by a partial name match.
+
+    @requires: A valid database cursor and a parameter `market_name_part`.
+    @modifies: None (read-only operation).
+    @effects: Executes an SQL query against the database.
+    @raises: Exceptions on SQL execution errors.
+    @returns: A dictionary with status and a list of found markets.
+    """
     # Используем тот же универсальный механизм поиска, но с конкретным параметром
     conditions = []
     args = []
@@ -186,6 +212,15 @@ def handle_find_market_by_fmid(cursor, params):
     Выполняет поиск рынка по точному совпадению FMID.
     Эта функция не зависит от handle_find_markets.
     """
+    """
+    Finds a market by its unique FMID identifier.
+
+    @requires: A valid database cursor and a parameter `fmid`.
+    @modifies: None (read-only operation).
+    @effects: Executes an SQL query against the database.
+    @raises: Exceptions on SQL execution errors.
+    @returns: A dictionary with status and market data or an empty list.
+    """
     fmid = params.get('fmid')
     
     # Если параметр не передан, возвращаем ошибку
@@ -220,6 +255,16 @@ def handle_find_market_by_fmid(cursor, params):
     
 def handle_get_market_details(cursor, params):
     """Получение подробной информации о рынке."""
+    """
+     Retrieves comprehensive details for a specific market.
+
+     @requires: A valid database cursor and a parameter `fmid`.
+     @modifies: None (read-only operation).
+     @effects: Executes a series of SQL queries to gather data from multiple tables.
+               Converts data types (e.g., datetime) for JSON serialization.
+     @raises: Exceptions on SQL execution or data type conversion errors.
+     @returns: A dictionary with status and structured market data.
+     """
     fmid = params.get('fmid')
     result = {}
 
@@ -320,6 +365,15 @@ def handle_get_market_details(cursor, params):
 
 
 def handle_add_review(cursor, params, db_conn):
+     """
+     Adds a new review for a specific market to the database.
+
+     @requires: A valid database cursor, a connection `db_conn`, and parameters `fmid`, `rating`, `comment`, `author`.
+     @modifies: The `reviews` table in the database (inserts a record).
+     @effects: Commits the transaction to the database.
+     @raises: Exceptions on insertion or commit errors.
+     @returns: A dictionary with status and a success message.
+     """
      fmid = params.get('fmid')
      rating = params.get('rating')
      comment = params.get('comment')
@@ -336,6 +390,15 @@ def handle_add_review(cursor, params, db_conn):
 
 
 def handle_get_reviews_by_fmid(cursor, params):
+     """
+     Retrieves all reviews for a specific market.
+
+     @requires: A valid database cursor and a parameter `fmid`.
+     @modifies: None (read-only operation).
+     @effects: Executes SQL queries to fetch reviews and author data from the `users` table.
+     @raises: Exceptions on SQL execution errors.
+     @returns: A dictionary with status and a list of reviews with author names.
+     """
      fmid = params.get('fmid')
      
      query_reviews = """
@@ -375,6 +438,15 @@ def handle_get_reviews_by_fmid(cursor, params):
 
 
 def handle_edit_review(cursor, params, db_conn):
+     """
+      Edits an existing review's rating and comment text.
+
+      @requires: A valid database cursor, a connection `db_conn`, and parameters to identify the review (`fmid`, `author`) and new data (`new_rating`, `new_comment`).
+      @modifies: The `reviews` table in the database (updates a record).
+      @effects: Commits the transaction to the database. Checks `cursor.rowcount` to validate permissions.
+      @raises: Exceptions on update or commit errors.
+      @returns: A dictionary with status and a success or access-denied message.
+      """
      fmid = params.get('fmid')
      new_rating = params.get('new_rating')
      new_comment = params.get('new_comment')
@@ -397,6 +469,15 @@ def handle_edit_review(cursor, params, db_conn):
 
 
 def handle_remove_review(cursor, params, db_conn):
+     """
+      Removes a review from the database.
+
+      @requires: A valid database cursor, a connection `db_conn`, and parameters to identify the review (`fmid`, `author`).
+      @modifies: The `reviews` table in the database (deletes a record).
+      @effects: Commits the transaction to the database. Checks `cursor.rowcount` to validate permissions.
+      @raises: Exceptions on deletion or commit errors.
+      @returns: A dictionary with status and a success or access-denied message.
+      """
      fmid = params.get('fmid')
      author = params.get('author')
      
@@ -412,6 +493,15 @@ def handle_remove_review(cursor, params, db_conn):
 
 
 def handle_user_has_reviewed(cursor, params):
+     """
+     Checks if a user has already reviewed a specific market.
+
+     @requires: A valid database cursor and parameters `fmid`, `author`.
+     @modifies: None (read-only operation).
+     @effects: Executes an SQL query to count records in the `reviews` table.
+     @raises: Exceptions on SQL execution errors.
+     @returns: A dictionary with status and a boolean indicating if a review exists.
+     """ 
      fmid = params.get('fmid')
      author = params.get('author')
      
@@ -423,6 +513,15 @@ def handle_user_has_reviewed(cursor, params):
 
 
 def handle_check_user_exists(cursor, params):
+     """
+     Checks if a user exists in the database.
+
+     @requires: A valid database cursor and a parameter `username`.
+     @modifies: None (read-only operation).
+     @effects: Executes an SQL query to count records in the `users` table.
+     @raises: Exceptions on SQL execution errors.
+     @returns: A dictionary with status and a boolean indicating if the user exists.
+     """
      username = params.get('username')
      
      query = "SELECT COUNT(*) FROM users WHERE username=%s;"
@@ -433,6 +532,16 @@ def handle_check_user_exists(cursor, params):
 
 
 def handle_create_user(cursor, params, db_conn):
+     """
+     Creates a new user account in the database.
+
+     @requires: A valid database cursor, a connection `db_conn`, and registration parameters (`username`, `password`, `firstname`, `lastname`).
+               The password is hashed inside the function.
+     @modifies: The `users` table in the database (inserts a record).
+     @effects: Commits the transaction to the database. Handles unique username violations (`UniqueViolation`).
+     @raises: Exceptions on insertion or commit errors (except for duplicate username).
+     @returns: A dictionary with status and a success or duplicate-user error message.
+     """
      username = params.get('username')
      password_hash = sha256(params['password'].encode()).hexdigest()
      firstname = params.get('firstname')
@@ -451,6 +560,16 @@ def handle_create_user(cursor, params, db_conn):
 
 
 def handle_verify_login(cursor, params):
+     """
+      Verifies user login credentials.
+
+      @requires: A valid database cursor and login parameters (`username`, `password`).
+                The password is hashed inside the function for comparison with the stored hash.
+      @modifies: None (read-only operation).
+      @effects: Executes an SQL query to fetch the user's password hash from the `users` table.
+      @raises: Exceptions on SQL execution errors.
+      @returns: A dictionary with authentication status (`authenticated`), full name, or an error message.
+     """
      username = params.get('username')
      password_hash_provided = sha256(params['password'].encode()).hexdigest()
      
@@ -478,6 +597,15 @@ def handle_verify_login(cursor, params):
                  
 # --- Запуск сервера ---
 def start_server(host, port):
+   """
+   Starts the TCP server to listen for incoming connections.
+
+   @requires: Host (`host`) and port (`port`) parameters for socket binding.
+   @modifies: Creates a socket, binds it to an address, and puts it into listening mode. Accepts incoming connections.
+   @effects: Prints status messages to the console. Calls the client handler function for each connection.
+   @raises: Exceptions on socket creation or binding errors.
+   @returns: None. The function runs indefinitely until interrupted externally.
+   """
    print(f"Попытка запуска сервера на {host}:{port}...")
    try:
        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
