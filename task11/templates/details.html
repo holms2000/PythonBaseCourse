@@ -1,0 +1,62 @@
+<!-- templates/markets/details.html -->
+{% extends 'base.html' %}
+{% block title %}Детали рынка {{ market.market_name }}{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-md-8">
+    <h1>{{ market.market_name }}</h1>
+    
+    <!-- Блок с основной информацией -->
+    <p><strong>Адрес:</strong> {{ market.address.street }}, {{ market.address.city }}, {{ market.address.state }} {{ market.address.zip_code }}</p>
+    
+    <!-- Блок с продуктами (пример) -->
+    {% if market.products %}
+    <h5>Продукты:</h5>
+    <ul class="list-group">
+      {% for product in market.products.get_product_display_list %} <!-- Это нужно реализовать в модели или через тег -->
+        <li class="list-group-item">{{ product }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    
+    <!-- Блок с отзывами -->
+    <hr>
+    <h4>Отзывы ({{ reviews|length }})</h4>
+    
+    {% if reviews %}
+      {% for review in reviews %}
+        <div class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title">{{ review.fullname|default:"Аноним" }}</h5>
+            <p class="card-text"><strong>Рейтинг:</strong> {{ review.rating }}/5</p>
+            <p class="">{{ review.comment }}</p>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>Отзывов пока нет. Будьте первым!</p>
+    {% endif %}
+    
+  </div>
+  
+  <div class="col-md-4">
+    <!-- Боковая панель: форма отзыва или управления им -->
+    {% if user.is_authenticated %}
+      {% if has_reviewed %}
+        <h5>Ваш отзыв:</h5>
+        <!-- Здесь можно показать текущий отзыв и кнопки "Редактировать"/"Удалить" -->
+      {% else %}
+        <h5>Оставить отзыв:</h5>
+        <form method="post" action="{% url 'submit_review' market.FMID %}">
+          {% csrf_token %}
+          {{ form_review.as_p }}
+          <button type="submit" class="btn btn-success w-100">Отправить отзыв</button>
+        </form>
+      {% endif %}
+    {% else %}
+      <p>Чтобы оставить отзыв, пожалуйста, <a href="{% url 'login' %}">войдите в систему</a>.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

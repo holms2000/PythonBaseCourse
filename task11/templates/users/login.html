@@ -1,0 +1,65 @@
+<!-- templates/users/login.html -->
+
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Вход в систему{% endblock %}
+
+{% block content %}
+
+<div class="container">
+    <h2 class="mt-5">Вход в аккаунт</h2>
+
+    <!-- Блок для отображения ошибок (например, неверный логин/пароль) -->
+    {% if form.errors %}
+        <div style="margin-bottom: 20px; padding: 15px; background-color: #ffebee; border: 1px solid #ffcdd2; border-radius: 4px;">
+            <strong>Ошибка:</strong> Неверное имя пользователя или пароль.
+        </div>
+    {% endif %}
+
+    <form method="post" style="max-width: 400px; margin: auto; background: #f9f9f9; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        {% csrf_token %}
+
+        <div style="margin-bottom: 15px;">
+            <label for="id_username" style="display: block; margin-bottom: 5px; font-weight: bold;">Имя пользователя:</label>
+            {{ form.username }}
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="id_password" style="display: block; margin-bottom: 5px; font-weight: bold;">Пароль:</label>
+            {{ form.password }}
+        </div>
+
+        <button type="submit" style="
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        ">
+            Войти
+        </button>
+        
+        <button type="submit" style="
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        " onmouseover="this.style.backgroundColor='#0056b3'"
+        onmouseout="this.style.backgroundColor='#007bff'">
+            Войти
+        </button>
+
+    </form>
+</div>
+
+{% endblock %}

@@ -1,0 +1,210 @@
+<!-- templates/markets/main.html -->
+
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Главная - Фермерские рынки{% endblock %}
+
+{% block content %}
+
+<h1>Добро пожаловать, {{ user.get_full_name|default:"Гость" }}!</h1>
+
+<!-- Блок вкладок (Tabs) -->
+<div class="tabs">
+  <div class="tab-item">
+    <a href="#" class="tab-link active" data-tab-target="view-all">Все рынки</a>
+  </div>
+  <div class="tab-item">
+    <a href="#" class="tab-link" data-tab-target="search">Поиск</a>
+  </div>
+  <div class="tab-item">
+    <a href="#" class="tab-link" data-tab-target="review">Добавить отзыв</a>
+  </div>
+</div>
+
+<!-- Содержимое вкладок -->
+<div class="tab-content">
+
+  <!-- Вкладка "Просмотр всех рынков" -->
+  <div id="view-all" class="tab-pane active">
+      <p><a href="{% url 'view_all_markets' %}" class="btn btn-primary">Показать все рынки</a></p>
+      <table class="table">
+          <thead>
+              <tr>
+                  <th>FMID</th>
+                  <th>Название</th>
+                  <th>Адрес</th>
+              </tr>
+          </thead>
+          <tbody>
+              {% if markets_view_all %}
+                  {% for market in markets_view_all %}
+                      <tr data-fmid="{{ market.FMID }}">
+                          <td>{{ market.FMID }}</td>
+                          <td>{{ market.market_name }}</td>
+                          <td>{{ market.address__city }}, {{ market.address__state }}</td>
+                      </tr>
+                  {% endfor %}
+              {% else %}
+                  <tr>
+                      <td colspan="3" style="text-align: center;">Нажмите кнопку, чтобы загрузить список.</td>
+                  </tr>
+              {% endif %}
+          </tbody>
+      </table>
+  </div>
+
+  <!-- Вкладка "Поиск рынков" -->
+  <div id="search" class="tab-pane">
+      <h4>Простой поиск</h4>
+      <form method="get" action="{% url 'search_markets' %}">
+          {{ form_search.as_p }}
+          <button type="submit" class="btn btn-outline-primary">Искать</button>
+      </form>
+      
+      <p><a href="#" class="btn btn-info" data-toggle="modal" data-target="#advancedSearchModal">Расширенный поиск</a></p>
+
+      <table class="table">
+          <thead>
+              <tr>
+                  <th>FMID</th>
+                  <th>Название</th>
+                  <th>Адрес</th>
+              </tr>
+          </thead>
+          <tbody>
+              {% if markets_search %}
+                  {% for market in markets_search %}
+                      <tr data-fmid="{{ market.FMID }}">
+                          <td>{{ market.FMID }}</td>
+                          <td>{{ market.market_name }}</td>
+                          <td>{{ market.address__city }}, {{ market.address__state }}</td>
+                      </tr>
+                  {% empty %}
+                      <tr>
+                          <td colspan="3" style="text-align: center;">Рынков по вашему запросу не найдено.</td>
+                      </tr>
+                  {% endfor %}
+              {% endif %}
+          </tbody>
+      </table>
+
+      <!-- Модальное окно для расширенного поиска (заглушка) -->
+      <div id="advancedSearchModal" class="modal">
+          <div class="modal-content">
+              <span class="close-modal">×</span>
+              <h4>Расширенный поиск</h4>
+              <p>Здесь будет форма с полями для города, штата, индекса, координат и т.д.</p>
+          </div>
+      </div>
+  </div>
+
+  <!-- Вкладка "Добавить отзыв" -->
+  <div id="review" class="tab-pane">
+      <h4>Найти рынок для отзыва</h4>
+      
+      <!-- ФОРМА ПОИСКА РЫНКА -->
+      <form method="post" action="{% url 'find_market_for_review' %}">
+        {% csrf_token %}
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" id="id_search_market" name="search_market" placeholder="Введите название или FMID">
+            
+            <!-- Скрытые поля для передачи режима поиска -->
+            <input type="hidden" name="search_mode" id="id_search_mode" value="name">
+            
+            <button class="btn btn-outline-primary" type="submit">Найти</button>
+        </div>
+      </form>
+
+      <!-- ТАБЛИЦА С РЕЗУЛЬТАТАМИ ПОИСКА -->
+      <table class="table table-sm">
+          <thead>
+              <tr>
+                  <th>FMID</th>
+                  <th>Название</th>
+                  <th>Адрес</th>
+                  <th></th>
+              </tr>
+          </thead>
+          <tbody id="review-markets-tbody">
+              {% if markets_for_review %}
+                  {% for market in markets_for_review %}
+                      <tr data-fmid="{{ market.FMID }}">
+                          <td>{{ market.FMID }}</td>
+                          <td>{{ market.market_name }}</td>
+                          <td>{{ market.address__city }}, {{ market.address__state }}</td>
+                          <td>
+                              <!-- Кнопка для выбора рынка -->
+                              <button 
+                                type="button" 
+                                class="btn btn-primary btn-sm select-market-btn"
+                                data-fmid="{{ market.FMID }}"
+                                data-name="{{ market.market_name }}">
+                                Выбрать
+                              </button>
+                          </td>
+                      </tr>
+                  {% empty %}
+                      <tr><td colspan="4" style="text-align: center;">Рынки появятся здесь после поиска.</td></tr>
+                  {% endfor %}
+              {% endif %}
+          </tbody>
+      </table>
+
+      <!-- БЛОК ФОРМЫ ОТЗЫВА (появляется после выбора рынка) -->
+      <div id="review-form-block" class="card d-none mt-3">
+        <div class="card-header">
+            Оставить отзыв для: <span id="selected-market-display"></span>
+        </div>
+        <div class="card-body">
+            <!-- Скрытые поля для передачи данных в views.py -->
+            <input type="hidden" id="id_selected_fmid" name="selected_fmid">
+            <input type="hidden" idid_selected_market_name" name="selected_market_name">
+            
+            {% if selected_market_for_review %}
+                <h4>Оставить отзыв для: {{ selected_market_for_review.market_name }}</h4>
+                <form method="post" action="{% url 'submit_review' selected_market_for_review.FMID %}">
+                    {% csrf_token %}
+                    {{ form_review.as_p }}
+                    <button type="submit" class="btn btn-success">Отправить отзыв</button>
+                </form>
+            {% else %}
+                <p>Выберите рынок из списка выше, чтобы оставить отзыв.</p>
+            {% endif %}
+        </div>
+      </div>
+
+  </div> <!-- Конец Вкладка 3 -->
+
+</div> <!-- КОНЕЦ блока .tab-content -->
+
+<!-- Подключаем скрипты -->
+<script src="{% static 'js/vanilla-tabs.js' %}"></script>
+<script src="{% static 'js/markets_main.js' %}"></script>
+
+<!-- Скрипт для обработки выбора рынка во вкладке "Добавить отзыв" -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Обработчик клика по кнопкам "Выбрать"
+    document.querySelectorAll('.select-market-btn').forEach(function(button) {
+        button.addEventListener('click', function () {
+            const fmid = button.getAttribute('data-fmid');
+            const name = button.getAttribute('data-name');
+
+            // Заполняем скрытые поля формы
+            document.getElementById('id_selected_fmid').value = fmid;
+            document.getElementById('id_selected_market_name').value = name;
+
+            // Показываем название выбранного рынка и блок с формой
+            document.getElementById('selected-market-display').textContent = name;
+            document.getElementById('review-form-block').classList.remove('d-none');
+
+            // Очищаем таблицу с результатами поиска
+            const tableBody = document.querySelector('#review-markets-tbody');
+            tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Рынок выбран. Форма для отзыва выше.</td></tr>';
+        });
+    });
+});
+</script>
+
+{% endblock %}

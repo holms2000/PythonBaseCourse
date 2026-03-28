@@ -1,0 +1,78 @@
+<!-- templates/markets/main.html -->
+{% load static %}
+{% extends 'base.html' %}
+{% block title %}Главная - Фермерские рынки{% endblock %}
+
+{% block content %}
+<h1>Добро пожаловать, {{ user.get_full_name|default:user.username }}!</h1>
+
+<!-- Вкладки (аналог Notebook в Tkinter) -->
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="view-all-tab" data-bs-toggle="tab" data-bs-target="#view-all" type="button">Все рынки</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="search-tab" data-bs-toggle="tab" data-bs-target="#search" type="button">Поиск</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="review-tab" data-bs-toggle="tab" data-bs-target="#review" type="button">Добавить отзыв</button>
+  </li>
+</ul>
+
+<!-- Содержимое вкладок -->
+<div class="tab-content mt-3" id="myTabContent">
+  <!-- Вкладка "Все рынки" -->
+  <div class="tab-pane fade show active" id="view-all" role="tabpanel">
+      <button class="btn btn-primary mb-3" id="btn-view-all">Показать все рынки</button>
+      <table class="table table-striped table-hover" id="table-view-all">
+          <thead>
+              <tr><th>FMID</th><th>Название</th><th>Адрес</th></tr>
+          </thead>
+          <tbody>
+              <!-- Строки будут добавлены сюда через JavaScript -->
+          </tbody>
+      </table>
+  </div>
+
+  <!-- Вкладка "Поиск рынков" -->
+  <div class="tab-pane fade" id="search" role="tabpanel">
+      <h4>Простой поиск</h4>
+      <form method="get">
+          {{ form_search.as_p }}
+          <button type="submit" class="btn btn-outline-primary">Искать</button>
+      </form>
+      <button class="btn btn-info mt-3" data-bs-toggle="modal" data-bs-target="#advancedSearchModal">Расширенный поиск</button>
+      
+      <table class="table table-striped table-hover mt-3" id="table-search">
+          <thead><tr><th>FMID</th><th>Название</th><th>Адрес</th></tr></thead>
+          <tbody></tbody>
+      </table>
+  </div>
+
+  <!-- Вкладка "Добавить отзыв" -->
+  <div class="tab-pane fade" id="review" role="tabpanel">
+      <h4>Найти рынок для отзыва</h4>
+      <div class="input-group mb-3">
+        <input type="text" class="form-control" id="id_search_market" placeholder="Введите название или FMID">
+        <button class="btn btn-outline-secondary" type="button" id="btn-find-market">Найти</button>
+      </div>
+      
+      <table class="table table-hover table-sm" id="table-review-markets">
+          <thead><tr><th>FMID</th><th>Название</th><th>Адрес</th></tr></thead>
+          <tbody></tbody>
+      </table>
+  </div>
+</div>
+
+<!-- Модальное окно для расширенного поиска -->
+<div class="modal fade" id="advancedSearchModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <!-- Содержимое окна будет загружаться сюда через JavaScript или отдельный шаблон -->
+    </div>
+  </div>
+</div>
+
+<!-- Скрипты для работы страницы (AJAX-запросы к API) -->
+<script src="{% static 'js/markets_main.js' %}"></script>
+{% endblock %}

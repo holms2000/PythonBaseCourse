@@ -1,0 +1,35 @@
+html
+
+<!-- templates/markets/view_all.html -->
+{% extends 'base.html' %}{% block title %}Все рынки{% endblock %}
+
+{% block content %}
+
+<h2>Все фермерские рынки</h2>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>FMID</th>
+      <th>Название</th>
+      <th>Адрес</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for market in markets %}
+      <tr>
+        <td>{{ market.FMID }}</td>
+        <td>{{ market.market_name }}</td>
+        <td>
+          {{ market.address.street }},<br>
+          {{ market.address.city }}, {{ market.address.state }} {{ market.address.zip_code }}
+        </td>
+      </tr>
+    {% empty %}
+      <tr>
+        <td colspan="3" style="text-align: center;">Рынков не найдено.</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

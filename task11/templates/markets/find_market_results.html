@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block title %}Результаты поиска - Фермерские рынки{% endblock %}
+
+{% block content %}
+
+  <div class="container mt-4">
+    <h2>Результаты поиска</h2>
+
+    <!-- Блок для вывода ошибок или информационных сообщений -->
+    {% if error_message %}
+      <div class="alert alert-danger" role="alert">
+        {{ error_message }}
+      </div>
+    {% elif not markets %}
+      <div class="alert alert-info" role="alert">
+        Рынков по вашему запросу не найдено. Попробуйте изменить параметры поиска.
+      </div>
+    {% endif %}
+
+    <!-- Таблица с результатами поиска -->
+    {% if markets %}
+      <table class="table table-striped table-hover" id="table-review-markets">
+        <thead class="table-dark">
+          <tr>
+            <th scope="col">FMID</th>
+            <th scope="col">Название</th>
+            <th scope="col">Адрес</th>
+            <th scope="col">Действие</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for market in markets %}
+            <tr data-fmid="{{ market.FMID }}">
+              <td>{{ market.FMID }}</td>
+              <td>{{ market.MarketName }}</td>
+              <td>
+                {{ market.address.street }},<br>
+                {{ market.address.city }}, {{ market.address.state }} {{ market.address.zip }}
+              </td>
+              <td>
+                <!-- Кнопка для выбора рынка и отображения формы отзыва -->
+                <button 
+                  type="button" 
+                  class="btn btn-primary btn-sm" 
+                  data-fmid="{{ market.FMID }}"
+                  data-name="{{ market.MarketName }}">
+                  Выбрать для отзыва
+                </button>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" class="text-center">Нет данных</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+
+  <!-- Скрипт для обработки клика по кнопке "Выбрать для отзыва" -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const buttons = document.querySelectorAll('#table-review-markets button[data-fmid]');
+      
+      buttons.forEach(function(button) {
+        button.addEventListener('click', function () {
+          const fmid = button.getAttribute('data-fmid');
+          const name = button.getAttribute('data-name');
+          
+          // Находим скрытые поля в основной форме отзыва и заполняем их
+          const selectedFmidInput = document.getElementById('id_selected_fmid');
+          const selectedNameInput = document.getElementById('id_selected_market_name');
+          
+          if (selectedFmidInput && selectedNameInput) {
+              selectedFmidInput.value = fmid;
+              selectedNameInput.value = name;
+              
+              // Показываем блок с формой отзыва (если он скрыт)
+              const reviewFormBlock = document.getElementById('review-form-block');
+              if (reviewFormBlock) {
+                  reviewFormBlock.classList.remove('d-none');
+              }
+              
+              // Показываем название выбранного рынка для пользователя
+              const selectedMarketDisplay = document.getElementById('selected-market-display');
+              if (selectedMarketDisplay) {
+                  selectedMarketDisplay.textContent = name;
+                  selectedMarketDisplay.closest('.card').classList.remove('d-none');
+              }
+              
+              // Очищаем таблицу с результатами поиска
+              const tableBody = document.querySelector('#table-review-markets tbody');
+              if (tableBody) {
+                  tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Рынок выбран</td></tr>';
+              }
+          }
+        });
+      });
+    });
+  </script>
+
+{% endblock %}

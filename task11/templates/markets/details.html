@@ -1,0 +1,114 @@
+<!-- templates/markets/details.html -->
+{% extends 'base.html' %}
+{% block title %}{{ market.market_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h1>{{ market.market_name }}</h1>
+    
+    <div class="row">
+      <div class="col-md-8">
+        
+        <h4>Адрес</h4>
+        <p>
+          {{ market.address.street }}<br>
+          {{ market.address.city }}, {{ market.address.state }} {{ market.address.zip_code }}<br>
+          {{ market.address.country }}
+        </p>
+        
+        {% if market.coordinates.latitude and market.coordinates.longitude %}
+        <h4>Координаты</h4>
+        <p>Широта: {{ market.coordinates.latitude }}, Долгота: {{ market.coordinates.longitude }}</p>
+        {% endif %}
+        
+        <h4>График работы</h4>
+        {% if market.schedule.all %}
+          <ul>
+            {% for sched in market.schedule.all %}
+              <li>
+                <strong>Сезон {{ sched.season_number }}:</strong><br>
+                {{ sched.season_date }} {{ sched.season_time }}<br>
+                {{ sched.day_of_week }} (с {{ sched.time_open }} до {{ sched.time_close }})
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p>Информация о графике работы недоступна.</p>
+        {% endif %}
+        
+        <h4>Способы оплаты</h4>
+        <ul class="list-unstyled">
+          {% if market.payment_options.credit_cards %}<li>✔️ Кредитные карты</li>{% endif %}
+          {% if market.payment_options.wic %}<li>✔️ WIC</li>{% endif %}
+          {% if market.payment_options.snap %}<li>✔️ SNAP</li>{% endif %}
+          {# ... и другие способы оплаты ... #}
+        </ul>
+        
+        <h4>Продукты</h4>
+        <ul class="list-unstyled">
+          {% if market.products.organic %}<li>✔️ Organic (Органические)</li>{% endif %}
+          {% if market.products.baked_goods %}<li>✔️ Baked Goods (Выпечка)</li>{% endif %}
+          {% if market.products.cheese %}<li>✔️ Cheese (Сыры)</li>{% endif %}
+          {# ... и другие продукты ... #}
+          {% if market.products.wild_harvested %}<li>✔️ Wild Harvested (Дикоросы)</li>{% endif %}
+        </ul>
+        
+      </div>
+      
+      <div class="col-md-4">
+        
+        <h4>Социальные сети</h4>
+        <ul class="list-unstyled">
+          {% if market.social_links.facebook %}<li><a href="{{ market.social_links.facebook }}" target="_blank">Facebook</a></li>{% endif %}
+          {% if market.social_links.twitter %}<li><a href="{{ market.social_links.twitter }}" target="_blank">Twitter</a></li>{% endif %}
+          {# ... другие соцсети ... #}
+        </ul>
+        
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<hr>
+
+<h3>Отзывы ({{ reviews|length }})</h3>
+{% if reviews %}
+  {% for review in reviews %}
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">{{ review.fullname|default:"Аноним" }}</h5>
+        <p class="card-text"><strong>Рейтинг:</strong> {{ review.rating }}/5</p>
+        <p class="card-text">{{ review.comment }}</p>
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <p>Отзывов пока нет. Будьте первым!</p>
+{% endif %}
+
+<!-- Форма отзыва -->
+{% if user.is_authenticated %}
+  <h3 class="mt-4">{% if has_reviewed %}Редактировать отзыв{% else %}Оставить отзыв{% endif %}</h3>
+  
+  <form method="post" action="{% url 'submit_review' market.FMID %}">
+    {% csrf_token %}
+    
+    <div class="mb-3">
+      <label for="id_rating" class="form-label">Рейтинг (1-5):</label>
+      <input type="number" min="1" max="5" class="form-control" id="id_rating" name="rating" required>
+    </div>
+    
+    <div class="mb-3">
+      <label for="id_comment" class="form-label">Комментарий:</label>
+      <textarea class="form-control" id="id_comment" name="comment" rows="3" required></textarea>
+    </div>
+    
+    <button type="submit" class="btn btn-success">Отправить отзыв</button>
+  </form>
+{% else %}
+  <p class="mt-4">Чтобы оставить отзыв, пожалуйста, <a href="{% url 'login' %}">войдите в систему</a>.</p>
+{% endif %}
+
+{% endblock %}
