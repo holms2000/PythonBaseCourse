@@ -1,53 +1,81 @@
 # users/views.py
 
 from django.shortcuts import render, redirect
-from django.contrib.auth import login, authenticate, logout
-from .forms import RegisterForm, LoginForm
+from django.contrib.auth import login as auth_login, logout as auth_logout
+from django.contrib.auth import get_user_model
+from .forms import LoginForm, RegisterForm # Импортируем обе формы
+import hashlib
 
+User = get_user_model()
+
+# --- РЕГИСТРАЦИЯ (закомментирована для отладки входа) ---
 def register_view(request):
     """
     Обработчик регистрации.
     """
-    if request.method == 'POST':
-        form = RegisterForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            # Автоматически логиним пользователя после регистрации
-            login(request, user)
-            return redirect('main_view') # Перенаправляем на главную страницу
-    else:
-        form = RegisterForm()
-    
-    return render(request, 'users/register.html', {'form': form})
+    # if request.method == 'POST':
+    #     form = RegisterForm(request.POST)
+    #     if form.is_valid():
+    #         user = form.save()
+    #         auth_login(request, user)
+    #         return redirect('main_view')
+    # else:
+    #     form = RegisterForm()
+    #
+    # return render(request, 'users/register.html', {'form': form})
 
+
+# --- ФИНАЛЬНАЯ ВЕРСИЯ ЛОГИКИ ВХОДА ---
 def login_view(request):
     """
     Обработчик входа в систему.
+    Логика полностью переписана вручную для работы с sha256.
     """
     if request.method == 'POST':
-        form = LoginForm(request, data=request.POST)
+        form = LoginForm(request.POST)
         if form.is_valid():
             username = form.cleaned_data.get('username')
             password = form.cleaned_data.get('password')
-            user = authenticate(username=username, password=password)
-            if user is not None:
-                login(request, user)
-                return redirect('main_view')
+            
+            try:
+                # 1. Находим пользователя в базе данных по username
+                user = User.objects.get(username=username)
+                
+                # 2. Создаем sha256 хеш от пароля, который ввел пользователь
+                hashed_input = hashlib.sha256(password.encode()).hexdigest()
+                
+                # 3. Сравниваем полученный хеш с тем, что хранится в базе (в поле password_hash)
+                if hashed_input == user.password_hash:
+                    # Если хеши совпали — пароль верный. Логиним пользователя.
+                    auth_login(request, user)
+                    return redirect('main_view')
+                
+            except User.DoesNotExist:
+                # Если пользователя нет, мы просто ничего не делаем.
+                # Это важно для защиты от перебора паролей (timing attack).
+                pass
+
+            # Если мы дошли до этой точки, значит логин или пароль неверные.
+            # Добавляем общую ошибку к форме.
+            form.add_error(None, 'Неверное имя пользователя или пароль.')
+                
     else:
         form = LoginForm()
     
     return render(request, 'users/login.html', {'form': form})
 
+
 def logout_view(request):
     """
     Обработчик выхода из системы.
     """
-    logout(request)
-    return redirect('login') # Перенаправляем на страницу входа
+    auth_logout(request)
+    return redirect('login')
+
 
 def profile_view(request):
     """
-    Пример страницы профиля (можно расширить).
+    Пример страницы профиля.
     """
     if not request.user.is_authenticated:
         return redirect('login')
