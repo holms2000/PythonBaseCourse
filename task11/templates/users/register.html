@@ -1,0 +1,71 @@
+<!-- templates/users/register.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Регистрация{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 400px; margin: 50px auto;">
+    <h2 style="text-align: center;">Регистрация нового аккаунта</h2>
+
+    <form method="post" style="background: #f9f9f9; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        {% csrf_token %}
+        
+        <!-- Поле для имени пользователя -->
+        <div style="margin-bottom: 15px;">
+            <label for="id_username" style="display: block; margin-bottom: 5px; font-weight: bold;">Имя пользователя:</label>
+            <input type="text" name="username" required 
+                   style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
+
+        <!-- НОВОЕ ПОЛЕ: Имя -->
+        <div style="margin-bottom: 15px;">
+            <label for="id_first_name" style="display: block; margin-bottom: 5px; font-weight: bold;">Имя:</label>
+            <input type="text" name="first_name" required
+                   style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
+
+        <!-- НОВОЕ ПОЛЕ: Фамилия -->
+        <div style="margin-bottom: 15px;">
+            <label for="id_last_name" style="display: block; margin-bottom: 5px; font-weight: bold;">Фамилия:</label>
+            <input type="text" name="last_name" required
+                   style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label for="id_password1" style="display: block; margin-bottom: 5px; font-weight: bold;">Пароль:</label>
+            <input type="password" name="password1" required
+                   style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="id_password2" style="display: block; margin-bottom: 5px; font-weight: bold;">Подтвердите пароль:</label>
+            <input type="password" name="password2" required
+                   style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
+
+        <button type="submit" style="
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        ">
+            Зарегистрироваться
+        </button>
+        
+        <div style="text-align: center; margin-top: 15px;">
+            <a href="{% url 'login' %}" style="
+                text-decoration: none;
+                color: #007bff;
+                font-weight: bold;
+            ">
+                Уже есть аккаунт? Войти
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

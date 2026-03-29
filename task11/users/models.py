@@ -55,7 +55,16 @@ class LegacyUser(AbstractBaseUser):
     @property
     def is_active(self):
         return True
+    
+    # --- Методы для отображения имени (для шаблона main.html) ---
+    def get_full_name(self):
+        """Возвращает 'Имя Фамилия' или username, если имя не указано."""
+        full_name = f'{self.first_name} {self.last_name}'.strip()
+        return full_name or self.username
 
+    def get_short_name(self):
+        return self.username
+    
     # --- Методы аутентификации ---
     def check_password(self, raw_password):
         return self.password_hash == hashlib.sha256(raw_password.encode()).hexdigest()

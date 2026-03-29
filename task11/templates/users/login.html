@@ -7,17 +7,17 @@
 
 {% block content %}
 
-<div class="container">
-    <h2 class="mt-5">Вход в аккаунт</h2>
+<div class="container" style="max-width: 400px; margin: 50px auto;">
+    <h2 class="mt-5" style="text-align: center;">Вход в аккаунт</h2>
 
     <!-- Блок для отображения ошибок (например, неверный логин/пароль) -->
     {% if form.errors %}
-        <div style="margin-bottom: 20px; padding: 15px; background-color: #ffebee; border: 1px solid #ffcdd2; border-radius: 4px;">
+        <div style="margin-bottom: 20px; padding: 15px; background-color: #ffebee; border: 1px solid #ffcdd2; border-radius: 4px; text-align: center;">
             <strong>Ошибка:</strong> Неверное имя пользователя или пароль.
         </div>
     {% endif %}
 
-    <form method="post" style="max-width: 400px; margin: auto; background: #f9f9f9; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <form method="post" style="background: #f9f9f9; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         {% csrf_token %}
 
         <div style="margin-bottom: 15px;">
@@ -44,21 +44,22 @@
             Войти
         </button>
         
-        <button type="submit" style="
-            width: 100%;
-            padding: 10px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        " onmouseover="this.style.backgroundColor='#0056b3'"
-        onmouseout="this.style.backgroundColor='#007bff'">
-            Войти
-        </button>
-
+        <div style="text-align: center; margin-top: 15px;">
+            <!-- Это ссылка, стилизованная под кнопку, для регистрации -->
+            <a href="{% url 'register' %}" style="
+                display: inline-block;
+                padding: 10px 20px;
+                background-color: #6c757d;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+                font-size: 16px;
+                transition: background-color 0.3s ease;
+                margin-top: 10px;
+            ">
+                Регистрация
+            </a>
+        </div>
     </form>
 </div>
 

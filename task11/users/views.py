@@ -3,29 +3,11 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth import get_user_model
-from .forms import LoginForm, RegisterForm # Импортируем обе формы
+from .forms import LoginForm # Импортируем форму для входа
 import hashlib
 
-User = get_user_model()
+User = get_user_model() # Получаем вашу модель LegacyUser
 
-# --- РЕГИСТРАЦИЯ (закомментирована для отладки входа) ---
-def register_view(request):
-    """
-    Обработчик регистрации.
-    """
-    # if request.method == 'POST':
-    #     form = RegisterForm(request.POST)
-    #     if form.is_valid():
-    #         user = form.save()
-    #         auth_login(request, user)
-    #         return redirect('main_view')
-    # else:
-    #     form = RegisterForm()
-    #
-    # return render(request, 'users/register.html', {'form': form})
-
-
-# --- ФИНАЛЬНАЯ ВЕРСИЯ ЛОГИКИ ВХОДА ---
 def login_view(request):
     """
     Обработчик входа в систему.
@@ -81,3 +63,60 @@ def profile_view(request):
         return redirect('login')
         
     return render(request, 'users/profile.html', {'user': request.user})
+
+
+# --- НОВАЯ, КОРРЕКТНАЯ ЛОГИКА РЕГИСТРАЦИИ ---
+def register_view(request):
+    """
+    Обработчик регистрации НОВЫХ пользователей в legacy-таблицу.
+    """
+    if request.method == 'POST':
+        # Получаем данные напрямую из request.POST
+        username = request.POST.get('username')
+        password1 = request.POST.get('password1')
+        password2 = request.POST.get('password2')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+
+        # --- ВАЛИДАЦИЯ ДАННЫХ ---
+        errors = []
+        
+        if password1 != password2:
+            errors.append('Пароли не совпадают.')
+        
+        if User.objects.filter(username=username).exists():
+            errors.append('Пользователь с таким именем уже существует.')
+            
+        if not (username and password1 and password2 and first_name and last_name):
+            errors.append('Все поля обязательны для заполнения.')
+
+        # Если есть ошибки, рендерим форму заново с сообщениями об ошибках
+        if errors:
+            return render(request, 'users/register.html', {
+                'errors': errors,
+                'username': username,
+                'first_name': first_name,
+                'last_name': last_name,
+            })
+
+        # --- СОЗДАНИЕ ПОЛЬЗОВАТЕЛЯ ---
+        # Если валидация пройдена, создаем объект пользователя
+        user = User(
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        
+        # Используем ваш метод set_password для создания SHA256 хэша
+        user.set_password(password1) 
+        
+        # Сохраняем пользователя в базу данных
+        user.save()
+        
+        # Сразу логиним нового пользователя
+        auth_login(request, user)
+        
+        return redirect('main_view')
+
+    # Если это GET-запрос, просто отображаем пустую форму регистрации
+    return render(request, 'users/register.html')
