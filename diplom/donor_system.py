@@ -607,7 +607,7 @@ class SearchWindow(tk.Toplevel):
             "stigma": "Наличие стигм (Да/Нет)"
         }
 
-        # --- 2. Словари для значений Combobox (ограниченные наборы данных) ---
+        # --- 2. ВОССТАНОВЛЕННЫЙ СЛОВАРЬ ЗНАЧЕНИЙ ДЛЯ COMBOBOX ---
         self.combobox_values = {
             "sex": ('М', 'Ж'),
             "blood_group": ('O(I)', 'A(II)', 'B(III)', 'AB(IV)'),
@@ -617,11 +617,9 @@ class SearchWindow(tk.Toplevel):
             "hair_type": ('Прямые', 'Вьющиеся'),
             "eye_shape": ('Прямой', 'Раскосый'),
             "nationality": ('Русский', 'Украинец','Белорусс'),
-            "hair_color": ('Блондин', 'Брюнет','Шатен'),
-            "hair_type":('Прямые', 'Вьющиеся'),
-            "eye_shape": ('Прямой', 'Раскосый'),
+            # Исправленные дубликаты для корректной работы словаря
             "eye_color": ('Зеленые', 'Серные'),
-            "Нос (форма)": ('Прямые', 'Вьющиеся'),
+            "nose_shape": ('Прямые', 'Вьющиеся'),
             "face_shape": ('Круглое', 'Полное'),
             "forehead_shape": ('Широкий', 'Узкий'),
             "body_type": ('Нормальное', 'Рахитическое'),
@@ -631,118 +629,110 @@ class SearchWindow(tk.Toplevel):
 
         # --- 3. Инициализация переменных для критериев поиска ---
         self.search_vars = {db_col: tk.StringVar() for db_col in self.column_map.keys()}
+        
+        # --- НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ ПОИСКА ПО МАТЕРИАЛУ ---
+        self.search_vars['name_bio'] = tk.StringVar() # Наименование материала
+        self.search_vars['material_type'] = tk.StringVar() # Тип материала
 
         # --- Блок интерфейса: Критерии поиска ---
         search_frame = tk.LabelFrame(self, text="Критерии поиска", padx=10, pady=10)
         search_frame.pack(pady=10, fill='x', padx=10)
 
-        # Динамическое создание виджетов
-        '''
-        row_count = 0
-        for db_col, display_name in self.column_map.items():
-            tk.Label(search_frame, text=f"{display_name}:").grid(row=row_count, column=0, sticky="e", padx=5, pady=2)
-            
-            if db_col in self.combobox_values:
-                widget = ttk.Combobox(
-                    search_frame,
-                    textvariable=self.search_vars[db_col],
-                    values=self.combobox_values[db_col],
-                    state='readonly',
-                    width=25
-                )
-                # Устанавливаем пустое значение по умолчанию
-                self.search_vars[db_col].set("")
-                widget.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
-                # Для булевых полей (Да/Нет) делаем combobox шире
-                if db_col in ["children", "stigma"]:
-                    widget.config(width=35)
-                
-            else:
-                widget = tk.Entry(search_frame, textvariable=self.search_vars[db_col], width=35)
-                widget.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
-            
-            row_count += 1
-        '''
-        # Динамическое создание виджетов в 3 колонки
         row_count = 0
         col_count = 0
         max_columns = 3
 
+        # --- ОСТАЛЬНЫЕ ПОЛЯ ДОНОРА С ЛОГИКОЙ ВСТАВКИ ---
         for db_col, display_name in self.column_map.items():
-            # Создаем и размещаем текстовую метку
-            tk.Label(search_frame, text=f"{display_name}:").grid(
-                row=row_count, column=col_count*2, sticky="e", padx=(0, 5), pady=2
-            )
             
-            # Создаем сам виджет (Entry или Combobox)
-            if db_col in self.combobox_values:
-                widget = ttk.Combobox(
-                    search_frame,
-                    textvariable=self.search_vars[db_col],
-                    values=self.combobox_values[db_col],
-                    state='readonly',
-                    width=25
-                )
-                self.search_vars[db_col].set("")
-                if db_col in ["children", "stigma"]:
-                    widget.config(width=25)
-            else:
-                widget = tk.Entry(search_frame, textvariable=self.search_vars[db_col], width=25)
+             if col_count >= max_columns:
+                 row_count += 1
+                 col_count = 0
 
-            # --- ПРИВЯЗКА МАСКИ ТОЛЬКО ДЛЯ ДАТЫ РОЖДЕНИЯ ---
-            if db_col == "birth_date":
-               widget.bind('<KeyRelease>', self.on_date_input)
+             tk.Label(search_frame, text=f"{display_name}:").grid(
+                 row=row_count, column=col_count*2, sticky="e", padx=(0, 5), pady=2
+             )
+             
+             # Создание виджета: Combobox или Entry
+             if db_col in self.combobox_values:
+                 widget = ttk.Combobox(
+                     search_frame,
+                     textvariable=self.search_vars[db_col],
+                     values=self.combobox_values[db_col],
+                     state='readonly',
+                     width=25
+                 )
+                 self.search_vars[db_col].set('') 
+                 
+             elif db_col == "birth_date":
+                 widget = tk.Entry(search_frame, textvariable=self.search_vars[db_col], width=25)
+                 widget.bind('<KeyRelease>', self.on_date_input)
+             
+             else:
+                 widget = tk.Entry(search_frame, textvariable=self.search_vars[db_col], width=25)
 
-            # Размещаем виджет в соседней ячейке (col_count*2 + 1)
-            widget.grid(row=row_count, column=col_count*2 + 1, sticky="w", padx=(5, 10), pady=2)
+             widget.grid(row=row_count, column=col_count*2 + 1, sticky="w", padx=(5, 10), pady=2)
             
-            # Переходим к следующей колонке
-            col_count += 1
+             # --- ЛОГИКА ВСТАВКИ НОВЫХ ПОЛЕЙ ПОСЛЕ 'stigma' ---
+             if db_col == 'stigma':
+                 
+                 col_count += 1
 
-            # Если заполнили 3 колонки, переходим на новую строку
-            if col_count >= max_columns:
-                row_count += 1
-                col_count = 0
+                 if col_count < max_columns - 1:
+                     
+                     tk.Label(search_frame, text="Наименование материала:").grid(
+                         row=row_count, column=col_count*2, sticky="e", padx=(20, 5), pady=2
+                     )
+                     widget_bio_name = tk.Entry(search_frame, textvariable=self.search_vars['name_bio'], width=25)
+                     widget_bio_name.grid(row=row_count, column=col_count*2 + 1, sticky="w", padx=(5, 10), pady=2)
+                     
+                     col_count += 1
 
-        # Кнопка "Найти" размещается на новой строке, по центру
-        ttk.Button(search_frame,
-                  text="Найти",
-                  command=self.perform_search).grid(
-                      row=row_count + 1, column=0, columnspan=max_columns,padx=(0, 5)
-                  ) 
-        ttk.Button(search_frame,
-                  text="Сброс",
-                  command=self.reset_search).grid(
-                      row=row_count + 1, column=1, columnspan=max_columns, padx=(0, 5)
-                  ) 
+                     tk.Label(search_frame, text="Тип материала:").grid(
+                         row=row_count, column=col_count*2, sticky="e", padx=(20, 5), pady=2
+                     )
+                     widget_bio_type = tk.Entry(search_frame, textvariable=self.search_vars['material_type'], width=25)
+                     widget_bio_type.grid(row=row_count, column=col_count*2 + 1, sticky="w", padx=(5, 10), pady=2)
+             
+             col_count += 1
+
+        # --- Кнопки управления поиском на одной строке ---
+        button_frame = tk.Frame(search_frame)
+        button_frame.grid(row=row_count + 1, column=0, columnspan=max_columns*2, pady=(15, 2), sticky="we")
+        
+        ttk.Button(button_frame, text="Найти", command=self.perform_search).pack(side='left', padx=(0, 10))
+        ttk.Button(button_frame, text="Сброс", command=self.reset_search).pack(side='left')
+        
+         # Статусная метка (на новой строке)
+        self.search_status_label = tk.Label(search_frame, text="", fg="grey")
+        self.search_status_label.grid(row=row_count + 2, column=0, columnspan=max_columns*2, pady=(5, 10), sticky="we")
+
         # --- Блок интерфейса: Таблица результатов ---
-        # Используем исходные имена колонок из БД для запроса и отображения
         self.columns_db = list(self.column_map.keys())
         
-        # Для отображения заголовков используем человекочитаемые имена
+         # Для отображения заголовков используем человекочитаемые имена
         self.columns_display = list(self.column_map.values())
 
         table_frame = tk.Frame(self)
         table_frame.pack(fill='both', expand=True, padx=10, pady=5)
 
         self.tree = ttk.Treeview(table_frame, columns=self.columns_db, show="headings")
-        
-        # Настройка колонок и заголовков (используем display имена)
+         
+         # Настройка колонок и заголовков (используем display имена)
         for i, col_db in enumerate(self.columns_db):
-            display_name = self.columns_display[i]
-            
-            self.tree.heading(col_db, text=display_name)
-            
+             display_name = self.columns_display[i]
+             self.tree.heading(col_db, text=display_name)
+             
              # Задаем начальные ширины колонок
-            if col_db == 'id':
+             if col_db == 'id':
                  self.tree.column(col_db, width=40, anchor='center')
-            elif col_db in ['sex', 'blood_group', 'rh_factor', 'children', 'stigma']:
+             elif col_db in ['sex', 'blood_group', 'rh_factor', 'children', 'stigma']:
                  self.tree.column(col_db, width=90, anchor='center')
-            elif col_db in ['height', 'weight', 'shoe_size']:
+             elif col_db in ['height', 'weight', 'shoe_size']:
                  self.tree.column(col_db, width=70, anchor='center')
-            else:
+             else:
                  self.tree.column(col_db, width=130) 
-        
+         
          # Настройка скроллбаров
         yscrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         xscrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
@@ -756,7 +746,6 @@ class SearchWindow(tk.Toplevel):
         table_frame.grid_columnconfigure(0, weight=1)
         table_frame.grid_rowconfigure(0, weight=1)
 
-         # --- Блок интерфейса: Кнопки действий ---
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=5)
 
@@ -767,135 +756,151 @@ class SearchWindow(tk.Toplevel):
         ttk.Button(btn_frame,
                    text="Закрыть",
                    command=self.destroy).pack(side='right', padx=5)
-        
-        # Статусная метка (сначала скрыта)
-        self.search_status_label = tk.Label(search_frame, text="", fg="grey")
-        # Размещаем её под кнопками, по центру
-        self.search_status_label.grid(row=row_count + 2, column=0, columnspan=max_columns*2, pady=(5, 10), sticky="we")
+
+    def on_date_input(self, event):
+       """
+       Форматирует ввод в поле даты по маске ГГГГ-ММ-ДД.
+       """
+       widget = event.widget
+       current_text = widget.get()
+
+       digits = ''.join(filter(str.isdigit, current_text))
+       
+       new_text = ""
+       if len(digits) > 4:
+           new_text = f"{digits[:4]}-"
+           if len(digits) > 6:
+               new_text += f"{digits[4:6]}-{digits[6:8]}"
+           else:
+               new_text += f"{digits[4:6]}"
+       elif len(digits) > 0:
+           new_text = digits[:4]
+
+       new_text = new_text[:10]
+
+       if current_text != new_text:
+           widget.delete(0, tk.END)
+           widget.insert(0, new_text)
+
+       cursor_pos = widget.index(tk.INSERT)
+       if cursor_pos < len(new_text):
+           next_char = new_text[cursor_pos] if cursor_pos < len(new_text) else None
+           if next_char == '-':
+               widget.icursor(cursor_pos + 1)
+           elif cursor_pos == 4 and len(new_text) > 5:
+               widget.icursor(5)
+           elif cursor_pos == 7 and len(new_text) > 8:
+               widget.icursor(8)
+
+
     def reset_search(self):
         """
         Сбрасывает все критерии поиска к значениям по умолчанию.
         Очищает таблицу результатов и скрывает статусные сообщения.
         """
-        # 1. Очистка всех полей ввода (Entry и Combobox)
         for field_var in self.search_vars.values():
-            field_var.set("") # Устанавливаем пустую строку для всех StringVar
-
-        # 2. Очистка таблицы результатов поиска
+             field_var.set("")
+ 
         self.tree.delete(*self.tree.get_children())
-
-        # 3. Скрытие статусной метки (если она была показана)
+ 
         self.search_status_label.grid_remove()
 
+
     def perform_search(self):
-        """Выполняет поиск доноров в БД по всем заданным критериям."""
-        conditions = []
-        params = []
-        boolean_fields = ["children", "stigma"]
+       """Выполняет поиск доноров в БД по всем заданным критериям."""
+       
+       has_donor_filters = any(self.search_vars[col].get().strip() for col in self.column_map.keys())
+       has_material_filters = any([
+           self.search_vars['name_bio'].get().strip(),
+           self.search_vars['material_type'].get().strip()
+       ])
+       
+       select_cols = ", ".join([f"d.{col}" for col in self.columns_db])
+       from_table = "donors d"
+       
+       conditions = []
+       material_conditions = []
+       params = []
+       
+       if has_donor_filters:
+           for db_col in self.columns_db:
+               raw_value = self.search_vars[db_col].get().strip()
+               if not raw_value:
+                   continue
 
-        for db_col in self.columns_db:
-            raw_value = self.search_vars[db_col].get().strip()
-            if not raw_value:
-                continue
+               if db_col in ["children", "stigma"]:
+                   value_for_db = raw_value == 'Да'
+                   conditions.append(f"d.{db_col} = %s")
+                   params.append(value_for_db)
+               else:
+                   if db_col in ["nationality", "hair_color", "eye_color", "nose_shape", "face_shape", 
+                               "forehead_shape", "body_type", "clothing_size", "shoe_size", 
+                               "education", "profession"]:
+                       conditions.append(f"d.{db_col} ILIKE %s")
+                       params.append(f"%{raw_value}%")
+                   else:
+                       conditions.append(f"d.{db_col} = %s")
+                       params.append(raw_value)
+       
+       name_bio = self.search_vars['name_bio'].get().strip()
+       material_type_val = self.search_vars['material_type'].get().strip()
+       
+       if name_bio:
+           material_conditions.append("m.name_bio ILIKE %s")
+           params.append(f"%{name_bio}%")
+           
+       if material_type_val:
+           material_conditions.append("m.material_type ILIKE %s")
+           params.append(f"%{material_type_val}%")
+       
+       
+       query = f"SELECT DISTINCT {select_cols} FROM {from_table}"
+       
+       all_conditions = conditions + material_conditions
 
-            if db_col in boolean_fields:
-                value_for_db = raw_value == 'Да'
-                conditions.append(f"{db_col} = %s")
-                params.append(value_for_db)
-            else:
-                if db_col in ["nationality", "hair_color", "eye_color", "nose_shape", "face_shape", 
-                            "forehead_shape", "body_type", "clothing_size", "shoe_size", 
-                            "education", "profession"]:
-                    conditions.append(f"{db_col} ILIKE %s")
-                    params.append(f"%{raw_value}%")
-                else:
-                    conditions.append(f"{db_col} = %s")
-                    params.append(raw_value)
+       if has_material_filters:
+           query += " JOIN biological_materials m ON d.id = m.id_donor"
+           
+           if all_conditions:
+               query += f" WHERE {' AND '.join(all_conditions)}"
+       
+       elif has_donor_filters and conditions:
+           query += f" WHERE {' AND '.join(conditions)}"
+       
+       db = DatabaseConnection(DB_CONFIG)
+       
+       try:
+           result = db.execute_query(query, params)
+           
+           self.tree.delete(*self.tree.get_children())
+           
+           for row in result:
+               self.tree.insert("", "end", values=row)
+   
+           if not result:
+               self.search_status_label.config(text="Доноры по заданным критериям не найдены.", fg="red")
+               self.search_status_label.grid()
+           else:
+               self.search_status_label.grid_remove()
+               
+       except Exception as e:
+           messagebox.showerror("Ошибка поиска", str(e))
 
-        query = f"SELECT {', '.join(self.columns_db)} FROM donors"
-        
-        if conditions:
-            query += f" WHERE {' AND '.join(conditions)}"
-        
-        db = DatabaseConnection(DB_CONFIG)
-        
-        try:
-            result = db.execute_query(query, params)
-            
-            # 1. Очистка таблицы перед вставкой новых данных
-            self.tree.delete(*self.tree.get_children())
-
-            # 2. Заполнение таблицы результатами поиска.
-            for row in result:
-                self.tree.insert("", "end", values=row)
-
-            # 3. НОВАЯ ЛОГИКА: Проверка на пустые результаты
-            if not result:
-                # Выводим текст в статусную метку
-                self.search_status_label.config(text="Доноры по заданным критериям не найдены.", fg="red")
-                self.search_status_label.grid() # Показываем метку
-            else:
-                # Если результаты есть, скрываем метку (на случай, если она была видна с прошлого раза)
-                self.search_status_label.grid_remove()
-
-        except Exception as e:
-            # Здесь оставляем messagebox для ошибок БД (синтаксис, недоступность)
-            messagebox.showerror("Ошибка поиска", str(e))
 
     def add_bio_for_selected(self):
-        """
-        Открывает окно добавления биоматериала для донора,
-        выбранного в таблице результатов поиска.
-        """
-        selected_item = self.tree.selection()
-        
-        if not selected_item:
-            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите донора из списка.")
-            return
+      """
+      Открывает окно добавления биоматериала для донора,
+      выбранного в таблице результатов поиска.
+      """
+      selected_item = self.tree.selection()
+      
+      if not selected_item:
+          messagebox.showwarning("Предупреждение", "Пожалуйста, выберите донора из списка.")
+          return
 
-        # Получаем ID донора из первого столбца таблицы (индекс 'id')
-        # Так как self.columns_db[0] это 'id', мы можем использовать его для надежности
-        donor_id = self.tree.item(selected_item[0])['values'][0]
-        
-        # Открываем окно добавления биоматериала, передавая ID донора
-        AddBioWindow(donor_id)
-    
-    def on_date_input(self, event):
-        """Форматирует ввод в поле даты по маске ГГГГ-ММ-ДД."""
-        widget = event.widget
-        current_text = widget.get()
-
-        # Оставляем только цифры
-        digits = ''.join(filter(str.isdigit, current_text))
-
-        # Формируем строку по маске
-        new_text = ""
-        if len(digits) > 4:
-            new_text = f"{digits[:4]}-"
-            if len(digits) > 6:
-                new_text += f"{digits[4:6]}-{digits[6:8]}"
-            else:
-                new_text += f"{digits[4:6]}"
-        elif len(digits) > 0:
-            new_text = digits[:4]
-
-        new_text = new_text[:10]
-
-        # Обновляем поле, если текст изменился (предотвращаем рекурсию)
-        if current_text != new_text:
-            widget.delete(0, tk.END)
-            widget.insert(0, new_text)
-
-        # Управление позицией курсора
-        cursor_pos = widget.index(tk.INSERT)
-        if cursor_pos < len(new_text):
-            next_char = new_text[cursor_pos] if cursor_pos < len(new_text) else None
-            if next_char == '-':
-                widget.icursor(cursor_pos + 1)
-            elif cursor_pos == 4 and len(new_text) > 5:  # После года -> месяц
-                widget.icursor(5)
-            elif cursor_pos == 7 and len(new_text) > 8:  # После месяца -> день
-                widget.icursor(8)     
+      donor_id = self.tree.item(selected_item[0])['values'][0]
+      
+      AddBioWindow(donor_id)
 
 class AddBioWindow(tk.Toplevel):
     """Окно для добавления биоматериала к существующему донору."""
