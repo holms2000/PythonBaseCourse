@@ -280,6 +280,7 @@ class MainMenu(tk.Tk):
 
     def open_search(self):
          SearchWindow()
+         
 
 
 class AddDonorWindow(tk.Toplevel):
@@ -577,108 +578,178 @@ class SearchWindow(tk.Toplevel):
     def __init__(self):
         super().__init__()
         self.title("Поиск доноров")
-        self.geometry("850x600")
+        self.geometry("1200x600") # Увеличена ширина для отображения всех колонок
+        self.resizable(True, True)
 
-        # 1. Инициализация всех переменных StringVar в самом начале
-        self.search_group_blood = tk.StringVar()
-        self.search_rh_factor = tk.StringVar()
-        self.search_eye_color = tk.StringVar()
-        self.search_nationality = tk.StringVar()
-        self.search_profession = tk.StringVar()
+        # --- 1. Инициализация переменных для критериев поиска ---
+        self.search_vars = {
+            "Группа крови": tk.StringVar(),
+            "Резус-фактор": tk.StringVar(),
+            "Цвет глаз": tk.StringVar(),
+            "Национальность": tk.StringVar(),
+            "Профессия": tk.StringVar(),
+        }
 
-        # 2. Словарь конфигурации для полей поиска
-        # Это заменяет сложную логику if/else и делает код надежнее
+        # --- 2. Конфигурация полей поиска ---
         search_fields_config = {
             "Группа крови:": {
-                "var": self.search_group_blood,
+                "var": self.search_vars["Группа крови"],
                 "type": "combobox",
-                "values": ['O(I)', 'A(II)', 'B(III)', 'AB(IV)']
+                "values": ['O(I)', 'A(II)', 'B(III)', 'AB(IV)'],
+                "width": 10
             },
             "Резус-фактор:": {
-                "var": self.search_rh_factor,
+                "var": self.search_vars["Резус-фактор"],
                 "type": "combobox",
-                "values": ['+', '-']
+                "values": ['+', '-'],
+                "width": 10
             },
             "Цвет глаз:": {
-                "var": self.search_eye_color,
+                "var": self.search_vars["Цвет глаз"],
                 "type": "entry",
                 "width": 20
             },
             "Национальность:": {
-                "var": self.search_nationality,
+                "var": self.search_vars["Национальность"],
                 "type": "entry",
                 "width": 20
             },
             "Профессия:": {
-                "var": self.search_profession,
+                "var": self.search_vars["Профессия"],
                 "type": "entry",
-                "width": 20
-            }
+                "width": 30
+            },
         }
 
-        # --- Блок создания виджетов для ввода критериев ---
-        search_frame_top = tk.Frame(self)
-        search_frame_top.pack(pady=10)
-        
-        row_search_count = 0
+        # --- Блок интерфейса: Критерии поиска ---
+        search_frame = tk.LabelFrame(self, text="Критерии поиска", padx=10, pady=10)
+        search_frame.pack(pady=10, fill='x', padx=10)
+
+        row_count = 0
         for label_text, config in search_fields_config.items():
-            # Создаем Label
-            tk.Label(search_frame_top, text=label_text).grid(
-                row=(row_search_count//3)*2 + 1,
-                column=(row_search_count%3)*2,
-                sticky="e", padx=5, pady=2
-            )
+            tk.Label(search_frame, text=label_text).grid(row=row_count, column=0, sticky="e", padx=5, pady=2)
             
-            # Создаем виджет (Combobox или Entry) на основе конфигурации
             if config["type"] == "combobox":
                 widget = ttk.Combobox(
-                    search_frame_top,
+                    search_frame,
                     textvariable=config["var"],
                     values=config["values"],
                     state='readonly',
-                    width=config.get("width", 15)
-                )
-            else:
-                widget = tk.Entry(
-                    search_frame_top,
-                    textvariable=config["var"],
                     width=config["width"]
                 )
+            else:
+                widget = tk.Entry(search_frame, textvariable=config["var"], width=config["width"])
                 
-            widget.grid(
-                row=(row_search_count//3)*2 + 1,
-                column=(row_search_count%3)*2 + 1,
-                sticky="w", padx=5, pady=2
-            )
-            row_search_count += 1
+            widget.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
+            row_count += 1
 
         # Кнопка "Найти"
-        ttk.Button(search_frame_top,
+        ttk.Button(search_frame,
                   text="Найти",
-                  command=self.perform_search).grid(row=3, column=0, columnspan=3, pady=10)
+                  command=self.perform_search).grid(row=row_count, column=0, columnspan=2, pady=15)
 
-        # --- Блок создания таблицы результатов ---
-        columns = ("id", "Пол", "Дата рождения", "Группа крови", "Резус",
-                   "Цвет глаз", "Национальность", "Профессия")
+        # --- Блок интерфейса: Таблица результатов ---
+        # Список всех полей из БД, которые нужно отобразить
+        self.columns = (
+            "id", "sex", "birth_date", "blood_group", "rh_factor",
+            "children", "height", "weight", "nationality", "hair_color",
+            "hair_type", "eye_shape", "eye_color", "nose_shape",
+            "face_shape", "forehead_shape", "body_type", "clothing_size",
+            "shoe_size", "education", "profession", "stigma"
+        )
+
+        self.columns_rus = (
+            "id", "Пол", "Дата рождения", "Группа крови", "Резус фактор",
+            "Дети", "Рост", "Вес", "Национальность", "Цвет волос",
+            "Тип волос", "Тип глаз", "Цвет глаз", "Тип носа",
+            "Тип лица", "Тип лба", "Тип тела", "Размер одежды",
+            "Размер обуви", "Образовании", "Профессия", "Cтигмы"
+        )
+        '''
+        table_frame = tk.Frame(self)
+        table_frame.pack(fill='both', expand=True, padx=10)
         
-        self.tree = ttk.Treeview(self, columns=columns, show="headings", height=15)
+        self.tree = ttk.Treeview(table_frame, columns=self.columns, show="headings")
         
-        for col in columns:
-            self.tree.heading(col, text=col.capitalize().replace('_', ' '))
-            self.tree.column(col, minwidth=0, width=100, stretch=False)
+        # Настройка колонок и заголовков
+        for col in self.columns:
+            display_name = col.replace('_', ' ').capitalize()
+            self.tree.heading(col, text=display_name)
             
-        self.tree.column("id", width=30)
-        self.tree.pack(padx=10, pady=10, fill='both', expand=True)
+            # Задаем начальные ширины колонок для удобства
+            if col == 'id':
+                self.tree.column(col, width=40)
+            elif col in ['sex', 'blood_group', 'rh_factor', 'children']:
+                self.tree.column(col, width=80, anchor='center')
+            elif col in ['height', 'weight', 'shoe_size']:
+                self.tree.column(col, width=60, anchor='center')
+            else:
+                self.tree.column(col, width=120) 
+        
+        # Добавляем скроллбар
+        yscrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscroll=yscrollbar.set)
+        
+        self.tree.pack(side="left", fill="both", expand=True)
+        yscrollbar.pack(side="right", fill="y")
+        '''
+        # --- Блок интерфейса: Таблица результатов ---
+        table_frame = tk.Frame(self)
+        table_frame.pack(fill='both', expand=True, padx=10, pady=5)
 
-        # --- Блок кнопок действий ---
-        btn_frame_bottom = tk.Frame(self)
-        btn_frame_bottom.pack(pady=5)
+        # Создаем Treeview
+        self.tree = ttk.Treeview(table_frame, columns=self.columns, show="headings")
+        
+        # Настройка колонок и заголовков
+        for col in range(0,len(self.columns)):
+            display_name = self.columns_rus[col].replace('_', ' ').capitalize()
+            self.tree.heading(self.columns[col], text=display_name)
+            
+            # Задаем начальные ширины колонок для удобства
+            if col == 'id':
+                self.tree.column(col, width=40)
+            elif col in ['sex', 'blood_group', 'rh_factor', 'children']:
+                self.tree.column(col, width=80, anchor='center')
+            elif col in ['height', 'weight', 'shoe_size']:
+                self.tree.column(col, width=60, anchor='center')
+            else:
+                self.tree.column(col, width=120)
 
-        ttk.Button(btn_frame_bottom,
+        # --- НАСТРОЙКА СКРОЛЛБАРОВ ---
+        # 1. Вертикальный скроллбар (был в коде)
+        yscrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        
+        # 2. Горизонтальный скроллбар (НОВОЕ)
+        xscrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
+        
+        # 3. Настраиваем Treeview для работы с обоими скроллбарами
+        self.tree.configure(yscroll=yscrollbar.set, xscroll=xscrollbar.set)
+
+        # --- РАЗМЕЩЕНИЕ ВИДЖЕТОВ В РАМКЕ (Frame) ---
+        # Используем grid для гибкого размещения
+        
+        # Treeview занимает основную область (столбцы 0 и 1, строки 0)
+        self.tree.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        
+        # Горизонтальный скроллбар под таблицей (столбцы 0 и 1, строка 1)
+        xscrollbar.grid(row=1, column=0, columnspan=2, sticky="ew")
+        
+        # Вертикальный скроллбар справа от таблицы (столбец 2, строка 0)
+        yscrollbar.grid(row=0, column=2, sticky="ns")
+
+        # --- НАСТРОЙКА ВЕСОВ ГРИДА ---
+        # Это позволяет таблице растягиваться при изменении размера окна
+        table_frame.grid_columnconfigure(0, weight=1)
+        table_frame.grid_rowconfigure(0, weight=1)
+        # --- Блок интерфейса: Кнопки действий ---
+        btn_frame = tk.Frame(self)
+        btn_frame.pack(pady=5)
+
+        ttk.Button(btn_frame,
                   text="Добавить биоматериал для выбранного донора",
                   command=self.add_bio_for_selected).pack(side='left', padx=5)
 
-        ttk.Button(btn_frame_bottom,
+        ttk.Button(btn_frame,
                   text="Закрыть",
                   command=self.destroy).pack(side='right', padx=5)
 
@@ -689,44 +760,52 @@ class SearchWindow(tk.Toplevel):
         params = []
 
         # Сбор условий для запроса WHERE из заполненных полей
-        if self.search_group_blood.get():
-            conditions.append("blood_group = %s")
-            params.append(self.search_group_blood.get())
+        for field_name, var in self.search_vars.items():
+            value = var.get().strip()
+            if not value:
+                continue
 
-        if self.search_rh_factor.get():
-            conditions.append("rh_factor = %s")
-            params.append(self.search_rh_factor.get())
+            # Привязка названия поля в БД к названию переменной в интерфейсе
+            db_field_map = {
+                "Группа крови": "blood_group",
+                "Резус-фактор": "rh_factor",
+                "Цвет глаз": "eye_color",
+                "Национальность": "nationality",
+                "Профессия": "profession"
+            }
 
-        if self.search_eye_color.get():
-            conditions.append("eye_color ILIKE %s")
-            params.append(f"%{self.search_eye_color.get()}%")
+            db_field = db_field_map[field_name]
+            
+            # Для текстовых полей используем ILIKE (без учета регистра) и поиск по вхождению
+            if field_name in ["Цвет глаз", "Национальность", "Профессия"]:
+                conditions.append(f"{db_field} ILIKE %s")
+                params.append(f"%{value}%")
+            else:
+                conditions.append(f"{db_field} = %s")
+                params.append(value)
 
-        if self.search_nationality.get():
-            conditions.append("nationality ILIKE %s")
-            params.append(f"%{self.search_nationality.get()}%")
-
-        if self.search_profession.get():
-            conditions.append("profession ILIKE %s")
-            params.append(f"%{self.search_profession.get()}%")
-
+        # Запрос выбирает ВСЕ поля в строгом порядке, соответствующем self.columns
         query = """
-            SELECT id, sex, birth_date, blood_group, rh_factor, eye_color, nationality, profession 
-            FROM donors
+            SELECT id, sex, birth_date, blood_group, rh_factor,
+                   children, height, weight, nationality, hair_color,
+                   hair_type, eye_shape, eye_color, nose_shape,
+                   face_shape, forehead_shape, body_type, clothing_size,
+                   shoe_size, education, profession, stigma
+              FROM donors
         """
         
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
-
+        
         db = DatabaseConnection(DB_CONFIG)
         
         try:
             result = db.execute_query(query, params)
             
             # Очистка таблицы перед вставкой новых данных
-            for item in self.tree.get_children():
-                self.tree.delete(item)
+            self.tree.delete(*self.tree.get_children())
 
-            # Заполнение таблицы результатами поиска
+            # Заполнение таблицы результатами поиска.
             for row in result:
                 self.tree.insert("", "end", values=row)
 
@@ -747,11 +826,11 @@ class SearchWindow(tk.Toplevel):
            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите донора из списка.")
            return
 
-       # Получаем ID донора из первого столбца таблицы (индекс 'id' или позиция 0 в values)
+       # Получаем ID донора из первого столбца таблицы (индекс 'id')
        donor_id = self.tree.item(selected_item[0])['values'][0]
        
        # Открываем окно добавления биоматериала, передавая ID донора
-       AddBioWindow(donor_id)       
+       AddBioWindow(donor_id)
 
 class AddBioWindow(tk.Toplevel):
     """Окно для добавления биоматериала к существующему донору."""
