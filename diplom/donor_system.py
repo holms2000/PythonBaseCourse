@@ -574,263 +574,328 @@ class AddDonorWindow(tk.Toplevel):
           self.bio_status_label.config(text="❌ Не удалось сохранить данные в базу данных.", fg="red")
 
 class SearchWindow(tk.Toplevel):
-    """Окно для поиска доноров по различным критериям."""
+    """Окно для поиска доноров по всем полям таблицы."""
     def __init__(self):
         super().__init__()
         self.title("Поиск доноров")
-        self.geometry("1200x600") # Увеличена ширина для отображения всех колонок
+        self.geometry("1200x800")
         self.resizable(True, True)
 
-        # --- 1. Инициализация переменных для критериев поиска ---
-        self.search_vars = {
-            "Группа крови": tk.StringVar(),
-            "Резус-фактор": tk.StringVar(),
-            "Цвет глаз": tk.StringVar(),
-            "Национальность": tk.StringVar(),
-            "Профессия": tk.StringVar(),
+        # --- 1. Словарь для сопоставления имен колонок БД и отображаемых имен ---
+        self.column_map = {
+            "id": "ID",
+            "sex": "Пол (М/Ж)",
+            "birth_date": "Дата рождения (ГГГГ-ММ-ДД)",
+            "blood_group": "Группа крови",
+            "rh_factor": "Резус-фактор",
+            "children": "Дети (Да/Нет)",
+            "height": "Рост (см)",
+            "weight": "Вес (кг)",
+            "nationality": "Национальность",
+            "hair_color": "Цвет волос",
+            "hair_type": "Тип волос",
+            "eye_shape": "Разрез глаз",
+            "eye_color": "Цвет глаз",
+            "nose_shape": "Форма носа",
+            "face_shape": "Овал лица",
+            "forehead_shape": "Лоб",
+            "body_type": "Телосложение",
+            "clothing_size": "Размер одежды",
+            "shoe_size": "Размер обуви",
+            "education": "Образование",
+            "profession": "Профессия",
+            "stigma": "Наличие стигм (Да/Нет)"
         }
 
-        # --- 2. Конфигурация полей поиска ---
-        search_fields_config = {
-            "Группа крови:": {
-                "var": self.search_vars["Группа крови"],
-                "type": "combobox",
-                "values": ['O(I)', 'A(II)', 'B(III)', 'AB(IV)'],
-                "width": 10
-            },
-            "Резус-фактор:": {
-                "var": self.search_vars["Резус-фактор"],
-                "type": "combobox",
-                "values": ['+', '-'],
-                "width": 10
-            },
-            "Цвет глаз:": {
-                "var": self.search_vars["Цвет глаз"],
-                "type": "entry",
-                "width": 20
-            },
-            "Национальность:": {
-                "var": self.search_vars["Национальность"],
-                "type": "entry",
-                "width": 20
-            },
-            "Профессия:": {
-                "var": self.search_vars["Профессия"],
-                "type": "entry",
-                "width": 30
-            },
+        # --- 2. Словари для значений Combobox (ограниченные наборы данных) ---
+        self.combobox_values = {
+            "sex": ('М', 'Ж'),
+            "blood_group": ('O(I)', 'A(II)', 'B(III)', 'AB(IV)'),
+            "rh_factor": ('+', '-'),
+            "children": ('Да', 'Нет'),
+            "hair_color": ('Блондин', 'Брюнет', 'Шатен'),
+            "hair_type": ('Прямые', 'Вьющиеся'),
+            "eye_shape": ('Прямой', 'Раскосый'),
+            "nationality": ('Русский', 'Украинец','Белорусс'),
+            "hair_color": ('Блондин', 'Брюнет','Шатен'),
+            "hair_type":('Прямые', 'Вьющиеся'),
+            "eye_shape": ('Прямой', 'Раскосый'),
+            "eye_color": ('Зеленые', 'Серные'),
+            "Нос (форма)": ('Прямые', 'Вьющиеся'),
+            "face_shape": ('Круглое', 'Полное'),
+            "forehead_shape": ('Широкий', 'Узкий'),
+            "body_type": ('Нормальное', 'Рахитическое'),
+            "education": ('Высшее', 'Среднее'),
+            "stigma": ('Да', 'Нет'),
         }
+
+        # --- 3. Инициализация переменных для критериев поиска ---
+        self.search_vars = {db_col: tk.StringVar() for db_col in self.column_map.keys()}
 
         # --- Блок интерфейса: Критерии поиска ---
         search_frame = tk.LabelFrame(self, text="Критерии поиска", padx=10, pady=10)
         search_frame.pack(pady=10, fill='x', padx=10)
 
+        # Динамическое создание виджетов
+        '''
         row_count = 0
-        for label_text, config in search_fields_config.items():
-            tk.Label(search_frame, text=label_text).grid(row=row_count, column=0, sticky="e", padx=5, pady=2)
+        for db_col, display_name in self.column_map.items():
+            tk.Label(search_frame, text=f"{display_name}:").grid(row=row_count, column=0, sticky="e", padx=5, pady=2)
             
-            if config["type"] == "combobox":
+            if db_col in self.combobox_values:
                 widget = ttk.Combobox(
                     search_frame,
-                    textvariable=config["var"],
-                    values=config["values"],
+                    textvariable=self.search_vars[db_col],
+                    values=self.combobox_values[db_col],
                     state='readonly',
-                    width=config["width"]
+                    width=25
                 )
-            else:
-                widget = tk.Entry(search_frame, textvariable=config["var"], width=config["width"])
+                # Устанавливаем пустое значение по умолчанию
+                self.search_vars[db_col].set("")
+                widget.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
+                # Для булевых полей (Да/Нет) делаем combobox шире
+                if db_col in ["children", "stigma"]:
+                    widget.config(width=35)
                 
-            widget.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
+            else:
+                widget = tk.Entry(search_frame, textvariable=self.search_vars[db_col], width=35)
+                widget.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
+            
             row_count += 1
+        '''
+        # Динамическое создание виджетов в 3 колонки
+        row_count = 0
+        col_count = 0
+        max_columns = 3
 
-        # Кнопка "Найти"
+        for db_col, display_name in self.column_map.items():
+            # Создаем и размещаем текстовую метку
+            tk.Label(search_frame, text=f"{display_name}:").grid(
+                row=row_count, column=col_count*2, sticky="e", padx=(0, 5), pady=2
+            )
+            
+            # Создаем сам виджет (Entry или Combobox)
+            if db_col in self.combobox_values:
+                widget = ttk.Combobox(
+                    search_frame,
+                    textvariable=self.search_vars[db_col],
+                    values=self.combobox_values[db_col],
+                    state='readonly',
+                    width=25
+                )
+                self.search_vars[db_col].set("")
+                if db_col in ["children", "stigma"]:
+                    widget.config(width=25)
+            else:
+                widget = tk.Entry(search_frame, textvariable=self.search_vars[db_col], width=25)
+
+            # --- ПРИВЯЗКА МАСКИ ТОЛЬКО ДЛЯ ДАТЫ РОЖДЕНИЯ ---
+            if db_col == "birth_date":
+               widget.bind('<KeyRelease>', self.on_date_input)
+
+            # Размещаем виджет в соседней ячейке (col_count*2 + 1)
+            widget.grid(row=row_count, column=col_count*2 + 1, sticky="w", padx=(5, 10), pady=2)
+            
+            # Переходим к следующей колонке
+            col_count += 1
+
+            # Если заполнили 3 колонки, переходим на новую строку
+            if col_count >= max_columns:
+                row_count += 1
+                col_count = 0
+
+        # Кнопка "Найти" размещается на новой строке, по центру
         ttk.Button(search_frame,
                   text="Найти",
-                  command=self.perform_search).grid(row=row_count, column=0, columnspan=2, pady=15)
-
+                  command=self.perform_search).grid(
+                      row=row_count + 1, column=0, columnspan=max_columns,padx=(0, 5)
+                  ) 
+        ttk.Button(search_frame,
+                  text="Сброс",
+                  command=self.reset_search).grid(
+                      row=row_count + 1, column=1, columnspan=max_columns, padx=(0, 5)
+                  ) 
         # --- Блок интерфейса: Таблица результатов ---
-        # Список всех полей из БД, которые нужно отобразить
-        self.columns = (
-            "id", "sex", "birth_date", "blood_group", "rh_factor",
-            "children", "height", "weight", "nationality", "hair_color",
-            "hair_type", "eye_shape", "eye_color", "nose_shape",
-            "face_shape", "forehead_shape", "body_type", "clothing_size",
-            "shoe_size", "education", "profession", "stigma"
-        )
+        # Используем исходные имена колонок из БД для запроса и отображения
+        self.columns_db = list(self.column_map.keys())
+        
+        # Для отображения заголовков используем человекочитаемые имена
+        self.columns_display = list(self.column_map.values())
 
-        self.columns_rus = (
-            "id", "Пол", "Дата рождения", "Группа крови", "Резус фактор",
-            "Дети", "Рост", "Вес", "Национальность", "Цвет волос",
-            "Тип волос", "Тип глаз", "Цвет глаз", "Тип носа",
-            "Тип лица", "Тип лба", "Тип тела", "Размер одежды",
-            "Размер обуви", "Образовании", "Профессия", "Cтигмы"
-        )
-        '''
-        table_frame = tk.Frame(self)
-        table_frame.pack(fill='both', expand=True, padx=10)
-        
-        self.tree = ttk.Treeview(table_frame, columns=self.columns, show="headings")
-        
-        # Настройка колонок и заголовков
-        for col in self.columns:
-            display_name = col.replace('_', ' ').capitalize()
-            self.tree.heading(col, text=display_name)
-            
-            # Задаем начальные ширины колонок для удобства
-            if col == 'id':
-                self.tree.column(col, width=40)
-            elif col in ['sex', 'blood_group', 'rh_factor', 'children']:
-                self.tree.column(col, width=80, anchor='center')
-            elif col in ['height', 'weight', 'shoe_size']:
-                self.tree.column(col, width=60, anchor='center')
-            else:
-                self.tree.column(col, width=120) 
-        
-        # Добавляем скроллбар
-        yscrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscroll=yscrollbar.set)
-        
-        self.tree.pack(side="left", fill="both", expand=True)
-        yscrollbar.pack(side="right", fill="y")
-        '''
-        # --- Блок интерфейса: Таблица результатов ---
         table_frame = tk.Frame(self)
         table_frame.pack(fill='both', expand=True, padx=10, pady=5)
 
-        # Создаем Treeview
-        self.tree = ttk.Treeview(table_frame, columns=self.columns, show="headings")
+        self.tree = ttk.Treeview(table_frame, columns=self.columns_db, show="headings")
         
-        # Настройка колонок и заголовков
-        for col in range(0,len(self.columns)):
-            display_name = self.columns_rus[col].replace('_', ' ').capitalize()
-            self.tree.heading(self.columns[col], text=display_name)
+        # Настройка колонок и заголовков (используем display имена)
+        for i, col_db in enumerate(self.columns_db):
+            display_name = self.columns_display[i]
             
-            # Задаем начальные ширины колонок для удобства
-            if col == 'id':
-                self.tree.column(col, width=40)
-            elif col in ['sex', 'blood_group', 'rh_factor', 'children']:
-                self.tree.column(col, width=80, anchor='center')
-            elif col in ['height', 'weight', 'shoe_size']:
-                self.tree.column(col, width=60, anchor='center')
+            self.tree.heading(col_db, text=display_name)
+            
+             # Задаем начальные ширины колонок
+            if col_db == 'id':
+                 self.tree.column(col_db, width=40, anchor='center')
+            elif col_db in ['sex', 'blood_group', 'rh_factor', 'children', 'stigma']:
+                 self.tree.column(col_db, width=90, anchor='center')
+            elif col_db in ['height', 'weight', 'shoe_size']:
+                 self.tree.column(col_db, width=70, anchor='center')
             else:
-                self.tree.column(col, width=120)
-
-        # --- НАСТРОЙКА СКРОЛЛБАРОВ ---
-        # 1. Вертикальный скроллбар (был в коде)
+                 self.tree.column(col_db, width=130) 
+        
+         # Настройка скроллбаров
         yscrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
-        
-        # 2. Горизонтальный скроллбар (НОВОЕ)
         xscrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
-        
-        # 3. Настраиваем Treeview для работы с обоими скроллбарами
         self.tree.configure(yscroll=yscrollbar.set, xscroll=xscrollbar.set)
-
-        # --- РАЗМЕЩЕНИЕ ВИДЖЕТОВ В РАМКЕ (Frame) ---
-        # Используем grid для гибкого размещения
-        
-        # Treeview занимает основную область (столбцы 0 и 1, строки 0)
+         
+         # Размещение с помощью grid для гибкости
         self.tree.grid(row=0, column=0, columnspan=2, sticky="nsew")
-        
-        # Горизонтальный скроллбар под таблицей (столбцы 0 и 1, строка 1)
         xscrollbar.grid(row=1, column=0, columnspan=2, sticky="ew")
-        
-        # Вертикальный скроллбар справа от таблицы (столбец 2, строка 0)
         yscrollbar.grid(row=0, column=2, sticky="ns")
-
-        # --- НАСТРОЙКА ВЕСОВ ГРИДА ---
-        # Это позволяет таблице растягиваться при изменении размера окна
+         
         table_frame.grid_columnconfigure(0, weight=1)
         table_frame.grid_rowconfigure(0, weight=1)
-        # --- Блок интерфейса: Кнопки действий ---
+
+         # --- Блок интерфейса: Кнопки действий ---
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=5)
 
         ttk.Button(btn_frame,
-                  text="Добавить биоматериал для выбранного донора",
-                  command=self.add_bio_for_selected).pack(side='left', padx=5)
+                   text="Добавить биоматериал для выбранного донора",
+                   command=self.add_bio_for_selected).pack(side='left', padx=5)
 
         ttk.Button(btn_frame,
-                  text="Закрыть",
-                  command=self.destroy).pack(side='right', padx=5)
+                   text="Закрыть",
+                   command=self.destroy).pack(side='right', padx=5)
+        
+        # Статусная метка (сначала скрыта)
+        self.search_status_label = tk.Label(search_frame, text="", fg="grey")
+        # Размещаем её под кнопками, по центру
+        self.search_status_label.grid(row=row_count + 2, column=0, columnspan=max_columns*2, pady=(5, 10), sticky="we")
+    def reset_search(self):
+        """
+        Сбрасывает все критерии поиска к значениям по умолчанию.
+        Очищает таблицу результатов и скрывает статусные сообщения.
+        """
+        # 1. Очистка всех полей ввода (Entry и Combobox)
+        for field_var in self.search_vars.values():
+            field_var.set("") # Устанавливаем пустую строку для всех StringVar
 
+        # 2. Очистка таблицы результатов поиска
+        self.tree.delete(*self.tree.get_children())
+
+        # 3. Скрытие статусной метки (если она была показана)
+        self.search_status_label.grid_remove()
 
     def perform_search(self):
-        """Выполняет поиск доноров в БД по заданным критериям."""
+        """Выполняет поиск доноров в БД по всем заданным критериям."""
         conditions = []
         params = []
+        boolean_fields = ["children", "stigma"]
 
-        # Сбор условий для запроса WHERE из заполненных полей
-        for field_name, var in self.search_vars.items():
-            value = var.get().strip()
-            if not value:
+        for db_col in self.columns_db:
+            raw_value = self.search_vars[db_col].get().strip()
+            if not raw_value:
                 continue
 
-            # Привязка названия поля в БД к названию переменной в интерфейсе
-            db_field_map = {
-                "Группа крови": "blood_group",
-                "Резус-фактор": "rh_factor",
-                "Цвет глаз": "eye_color",
-                "Национальность": "nationality",
-                "Профессия": "profession"
-            }
-
-            db_field = db_field_map[field_name]
-            
-            # Для текстовых полей используем ILIKE (без учета регистра) и поиск по вхождению
-            if field_name in ["Цвет глаз", "Национальность", "Профессия"]:
-                conditions.append(f"{db_field} ILIKE %s")
-                params.append(f"%{value}%")
+            if db_col in boolean_fields:
+                value_for_db = raw_value == 'Да'
+                conditions.append(f"{db_col} = %s")
+                params.append(value_for_db)
             else:
-                conditions.append(f"{db_field} = %s")
-                params.append(value)
+                if db_col in ["nationality", "hair_color", "eye_color", "nose_shape", "face_shape", 
+                            "forehead_shape", "body_type", "clothing_size", "shoe_size", 
+                            "education", "profession"]:
+                    conditions.append(f"{db_col} ILIKE %s")
+                    params.append(f"%{raw_value}%")
+                else:
+                    conditions.append(f"{db_col} = %s")
+                    params.append(raw_value)
 
-        # Запрос выбирает ВСЕ поля в строгом порядке, соответствующем self.columns
-        query = """
-            SELECT id, sex, birth_date, blood_group, rh_factor,
-                   children, height, weight, nationality, hair_color,
-                   hair_type, eye_shape, eye_color, nose_shape,
-                   face_shape, forehead_shape, body_type, clothing_size,
-                   shoe_size, education, profession, stigma
-              FROM donors
-        """
+        query = f"SELECT {', '.join(self.columns_db)} FROM donors"
         
         if conditions:
-            query += " WHERE " + " AND ".join(conditions)
+            query += f" WHERE {' AND '.join(conditions)}"
         
         db = DatabaseConnection(DB_CONFIG)
         
         try:
             result = db.execute_query(query, params)
             
-            # Очистка таблицы перед вставкой новых данных
+            # 1. Очистка таблицы перед вставкой новых данных
             self.tree.delete(*self.tree.get_children())
 
-            # Заполнение таблицы результатами поиска.
+            # 2. Заполнение таблицы результатами поиска.
             for row in result:
                 self.tree.insert("", "end", values=row)
 
+            # 3. НОВАЯ ЛОГИКА: Проверка на пустые результаты
             if not result:
-                messagebox.showinfo("Результат", "Доноры по заданным критериям не найдены.")
+                # Выводим текст в статусную метку
+                self.search_status_label.config(text="Доноры по заданным критериям не найдены.", fg="red")
+                self.search_status_label.grid() # Показываем метку
+            else:
+                # Если результаты есть, скрываем метку (на случай, если она была видна с прошлого раза)
+                self.search_status_label.grid_remove()
 
         except Exception as e:
+            # Здесь оставляем messagebox для ошибок БД (синтаксис, недоступность)
             messagebox.showerror("Ошибка поиска", str(e))
-            
-    def add_bio_for_selected(self):
-       """
-       Открывает окно добавления биоматериала для донора,
-       выбранного в таблице результатов поиска.
-       """
-       selected_item = self.tree.selection()
-       
-       if not selected_item:
-           messagebox.showwarning("Предупреждение", "Пожалуйста, выберите донора из списка.")
-           return
 
-       # Получаем ID донора из первого столбца таблицы (индекс 'id')
-       donor_id = self.tree.item(selected_item[0])['values'][0]
-       
-       # Открываем окно добавления биоматериала, передавая ID донора
-       AddBioWindow(donor_id)
+    def add_bio_for_selected(self):
+        """
+        Открывает окно добавления биоматериала для донора,
+        выбранного в таблице результатов поиска.
+        """
+        selected_item = self.tree.selection()
+        
+        if not selected_item:
+            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите донора из списка.")
+            return
+
+        # Получаем ID донора из первого столбца таблицы (индекс 'id')
+        # Так как self.columns_db[0] это 'id', мы можем использовать его для надежности
+        donor_id = self.tree.item(selected_item[0])['values'][0]
+        
+        # Открываем окно добавления биоматериала, передавая ID донора
+        AddBioWindow(donor_id)
+    
+    def on_date_input(self, event):
+        """Форматирует ввод в поле даты по маске ГГГГ-ММ-ДД."""
+        widget = event.widget
+        current_text = widget.get()
+
+        # Оставляем только цифры
+        digits = ''.join(filter(str.isdigit, current_text))
+
+        # Формируем строку по маске
+        new_text = ""
+        if len(digits) > 4:
+            new_text = f"{digits[:4]}-"
+            if len(digits) > 6:
+                new_text += f"{digits[4:6]}-{digits[6:8]}"
+            else:
+                new_text += f"{digits[4:6]}"
+        elif len(digits) > 0:
+            new_text = digits[:4]
+
+        new_text = new_text[:10]
+
+        # Обновляем поле, если текст изменился (предотвращаем рекурсию)
+        if current_text != new_text:
+            widget.delete(0, tk.END)
+            widget.insert(0, new_text)
+
+        # Управление позицией курсора
+        cursor_pos = widget.index(tk.INSERT)
+        if cursor_pos < len(new_text):
+            next_char = new_text[cursor_pos] if cursor_pos < len(new_text) else None
+            if next_char == '-':
+                widget.icursor(cursor_pos + 1)
+            elif cursor_pos == 4 and len(new_text) > 5:  # После года -> месяц
+                widget.icursor(5)
+            elif cursor_pos == 7 and len(new_text) > 8:  # После месяца -> день
+                widget.icursor(8)     
 
 class AddBioWindow(tk.Toplevel):
     """Окно для добавления биоматериала к существующему донору."""
