@@ -308,7 +308,7 @@ class AddDonorWindow(tk.Toplevel):
             "Дети (Да/Нет)": ("combobox", ('Да', 'Нет')),
             "Рост (см)": ("entry", 5),
             "Вес (кг)": ("entry", 5),
-            "Национальность": ("combobox", ('Русский', 'Украинец','Белорусс')),
+            "Национальность": ("combobox", ('Русский', 'Украинец','Белорус')),
             "Цвет волос": ("combobox", ('Блондин', 'Брюнет','Шатен')),
             "Волосы (тип)": ("combobox", ('Прямые', 'Вьющиеся')),
             "Разрез глаз": ("combobox", ('Прямой', 'Раскосый')),
@@ -584,11 +584,11 @@ class SearchWindow(tk.Toplevel):
         # --- 1. Словарь для сопоставления имен колонок БД и отображаемых имен ---
         self.column_map = {
             "id": "ID",
-            "sex": "Пол (М/Ж)",
-            "birth_date": "Дата рождения (ГГГГ-ММ-ДД)",
+            "sex": "Пол",
+            "birth_date": "Дата рождения",
             "blood_group": "Группа крови",
             "rh_factor": "Резус-фактор",
-            "children": "Дети (Да/Нет)",
+            "children": "Дети",
             "height": "Рост (см)",
             "weight": "Вес (кг)",
             "nationality": "Национальность",
@@ -604,7 +604,7 @@ class SearchWindow(tk.Toplevel):
             "shoe_size": "Размер обуви",
             "education": "Образование",
             "profession": "Профессия",
-            "stigma": "Наличие стигм (Да/Нет)"
+            "stigma": "Наличие стигм"
         }
 
         # --- 2. ВОССТАНОВЛЕННЫЙ СЛОВАРЬ ЗНАЧЕНИЙ ДЛЯ COMBOBOX ---
@@ -616,7 +616,7 @@ class SearchWindow(tk.Toplevel):
             "hair_color": ('Блондин', 'Брюнет', 'Шатен'),
             "hair_type": ('Прямые', 'Вьющиеся'),
             "eye_shape": ('Прямой', 'Раскосый'),
-            "nationality": ('Русский', 'Украинец','Белорусс'),
+            "nationality": ('Русский', 'Украинец','Белорус'),
             # Исправленные дубликаты для корректной работы словаря
             "eye_color": ('Зеленые', 'Серные'),
             "nose_shape": ('Прямые', 'Вьющиеся'),
@@ -683,7 +683,7 @@ class SearchWindow(tk.Toplevel):
                      tk.Label(search_frame, text="Наименование материала:").grid(
                          row=row_count, column=col_count*2, sticky="e", padx=(20, 5), pady=2
                      )
-                     widget_bio_name = tk.Entry(search_frame, textvariable=self.search_vars['name_bio'], width=25)
+                     widget_bio_name = ttk.Combobox(search_frame, textvariable=self.search_vars['name_bio'],values=("cперма","ооцит","эмбрион"), state='readonly', width=25)
                      widget_bio_name.grid(row=row_count, column=col_count*2 + 1, sticky="w", padx=(5, 10), pady=2)
                      
                      col_count += 1
@@ -691,7 +691,7 @@ class SearchWindow(tk.Toplevel):
                      tk.Label(search_frame, text="Тип материала:").grid(
                          row=row_count, column=col_count*2, sticky="e", padx=(20, 5), pady=2
                      )
-                     widget_bio_type = tk.Entry(search_frame, textvariable=self.search_vars['material_type'], width=25)
+                     widget_bio_type = ttk.Combobox(search_frame, textvariable=self.search_vars['material_type'],values=("крио","нативный"), state='readonly', width=25)
                      widget_bio_type.grid(row=row_count, column=col_count*2 + 1, sticky="w", padx=(5, 10), pady=2)
              
              col_count += 1
@@ -756,6 +756,8 @@ class SearchWindow(tk.Toplevel):
         ttk.Button(btn_frame,
                    text="Закрыть",
                    command=self.destroy).pack(side='right', padx=5)
+
+        self.tree.bind("<Double-1>", self.on_donor_double_click)
 
     def on_date_input(self, event):
        """
@@ -876,7 +878,12 @@ class SearchWindow(tk.Toplevel):
            
            for row in result:
                self.tree.insert("", "end", values=row)
-   
+
+           if result:  # Если список не пустой
+               first_item = self.tree.get_children()[0]
+               self.tree.selection_set(first_item) # Выделяем строку
+               self.tree.focus(first_item)         # Устанавливаем фокус
+
            if not result:
                self.search_status_label.config(text="Доноры по заданным критериям не найдены.", fg="red")
                self.search_status_label.grid()
@@ -901,6 +908,18 @@ class SearchWindow(tk.Toplevel):
       donor_id = self.tree.item(selected_item[0])['values'][0]
       
       AddBioWindow(donor_id)
+
+    def on_donor_double_click(self, event):
+       """Открывает окно с деталями донора при двойном щелчке по строке."""
+       selected_item = self.tree.selection()
+       if not selected_item:
+            return # Ничего не выбрано
+
+       # Получаем ID донора из первой колонки (индекс 0)
+       donor_id = self.tree.item(selected_item[0])['values'][0]
+        
+       # Открываем новое окно для редактирования
+       DonorDetailsWindow(donor_id)  
 
 class AddBioWindow(tk.Toplevel):
     """Окно для добавления биоматериала к существующему донору."""
@@ -1017,6 +1036,443 @@ class AddBioWindow(tk.Toplevel):
        if success:
            messagebox.showinfo("Успех", "Данные биоматериала успешно сохранены!")
            self.destroy()
+
+class EditBioWindow(tk.Toplevel):
+    """Окно для редактирования существующего биоматериала."""
+    def __init__(self, donor_id, bio_id):
+        super().__init__()
+        self.donor_id = donor_id
+        self.bio_id = bio_id
+        
+        self.title(f"Редактирование биоматериала ID: {bio_id}")
+        self.geometry("650x350")
+        
+        db = DatabaseConnection(DB_CONFIG)
+        
+        # Загружаем текущие данные материала
+        result = db.execute_query(
+            """SELECT name_bio, date_i, date_end, material_type,
+                  quantity, unit, genetic_passport 
+              FROM biological_materials 
+              WHERE id = %s""",
+            (self.bio_id,)
+        )
+        
+        if not result:
+            messagebox.showerror("Ошибка", "Биоматериал не найден.")
+            self.destroy()
+            return
+            
+        current_data = result[0]  # Получаем кортеж с данными
+
+        # --- Поля формы ---
+        fields_bio = {
+            "Наименование биоматериала": ("entry", 40),
+            "Дата получения (ГГГГ-ММ-ДД)": ("entry", 10),
+            "Срок годности (ГГГГ-ММ-ДД)": ("entry", 10),
+            "Тип материала": ("entry", 30),
+            "Количество материала": ("entry", 10),
+            "Единицы измерения": ("entry", 10),
+        }
+
+        row_count = 0
+        self.entries = {}
+
+        # Заполняем поля, используя имена колонок из запроса для корректного сопоставления
+        for label_text, (widget_type, params) in fields_bio.items():
+            tk.Label(self, text=label_text).grid(row=row_count, column=0, sticky="e", padx=5, pady=2)
+            
+            entry_var = tk.StringVar()
+            
+            # Устанавливаем текущее значение из базы данных
+            # current_data - это кортеж: (name_bio, date_i, date_end, material_type, quantity, unit, genetic_passport)
+            if label_text == "Наименование биоматериала":
+                entry_var.set(current_data[0])
+            elif label_text == "Дата получения (ГГГГ-ММ-ДД)":
+                entry_var.set(current_data[1])
+            elif label_text == "Срок годности (ГГГГ-ММ-ДД)":
+                entry_var.set(current_data[2])
+            elif label_text == "Тип материала":
+                entry_var.set(current_data[3])
+            elif label_text == "Количество материала":
+                entry_var.set(str(current_data[4]))
+            elif label_text == "Единицы измерения":
+                entry_var.set(current_data[5])
+
+            entry = tk.Entry(self, textvariable=entry_var, width=params)
+            
+            # Добавляем маску для полей даты
+            if "Дата" in label_text:
+                entry.bind('<KeyRelease>', self.on_date_input)
+                
+            entry.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
+            self.entries[label_text] = entry_var
+            
+            row_count += 1
+
+        # Флаг генетического паспорта
+        tk.Label(self, text="Генетический паспорт").grid(row=row_count, column=0, sticky="e", padx=5, pady=10)
+        self.genetic_passport_var = tk.BooleanVar()
+        
+        # Загружаем значение флага из БД (индекс 6 в кортеже)
+        if current_data[6]:
+             self.genetic_passport_var.set(True)
+             
+        ttk.Checkbutton(self, variable=self.genetic_passport_var).grid(row=row_count, column=1, sticky="w")
+        
+        row_count += 1
+
+        ttk.Button(self,
+                  text="Сохранить изменения и закрыть",
+                  command=self.save_and_close).grid(row=row_count + 1, column=0, columnspan=2, pady=15)
+    
+    def on_date_input(self, event):
+        """Форматирует ввод в поле даты по маске ГГГГ-ММ-ДД."""
+        widget = event.widget
+        current_text = widget.get()
+        digits = ''.join(filter(str.isdigit, current_text))
+        
+        new_text = ""
+        if len(digits) > 4:
+            new_text = f"{digits[:4]}-{digits[4:6]}"
+            if len(digits) > 6:
+                new_text += f"-{digits[6:8]}"
+        elif len(digits) > 0:
+            new_text = digits[:4]
+
+        new_text = new_text[:10]
+
+        if current_text != new_text:
+            widget.delete(0, tk.END)
+            widget.insert(0, new_text)
+
+    def save_and_close(self):
+       """Сохраняет измененные данные биоматериала в БД и закрывает окно."""
+       data = {field: var.get() for field, var in self.entries.items()}
+
+       required_fields = ['Наименование биоматериала', 'Дата получения (ГГГГ-ММ-ДД)', 'Срок годности (ГГГГ-ММ-ДД)', 'Количество материала']
+       for field in required_fields:
+           if not data.get(field):
+               messagebox.showerror("Ошибка заполнения", f"Поле '{field}' обязательно для заполнения.")
+               return
+
+       db = DatabaseConnection(DB_CONFIG)
+       
+       query_bio = """
+           UPDATE biological_materials SET
+               name_bio=%s,
+               date_i=%s,
+               date_end=%s,
+               material_type=%s,
+               quantity=%s,
+               unit=%s,
+               genetic_passport=%s
+           WHERE id=%s;
+       """
+       
+       params_bio = (
+           data['Наименование биоматериала'],
+           data['Дата получения (ГГГГ-ММ-ДД)'],
+           data['Срок годности (ГГГГ-ММ-ДД)'],
+           data['Тип материала'],
+           float(data['Количество материала']),
+           data['Единицы измерения'],
+           True if self.genetic_passport_var.get() else False,
+           self.bio_id
+       )
+       
+       success = db.execute_update(query_bio, params_bio)
+
+       if success:
+           messagebox.showinfo("Успех", "Данные биоматериала успешно обновлены!")
+           self.destroy()
+
+class DonorDetailsWindow(tk.Toplevel):
+    """Окно для просмотра и редактирования данных донора и его биоматериалов."""
+    def __init__(self, donor_id):
+        super().__init__()
+        self.donor_id = donor_id
+        self.title(f"Детали донора ID: {donor_id}")
+        self.geometry("800x700")
+        
+        # Словарь для хранения переменных полей
+        self.entries = {}
+        
+        # --- Загрузка данных донора ---
+        db = DatabaseConnection(DB_CONFIG)
+        donor_data = db.execute_query(
+            "SELECT * FROM donors WHERE id = %s", 
+            (self.donor_id,)
+        )
+        
+        if not donor_data:
+            messagebox.showerror("Ошибка", "Донор не найден.")
+            self.destroy()
+            return
+            
+        donor_data = donor_data[0] # Получаем первую строку результата
+
+        # --- Создание интерфейса ---
+        tab_control = ttk.Notebook(self)
+        
+        # Вкладка 1: Данные донора
+        donor_tab = ttk.Frame(tab_control)
+        
+        # Поля донора
+        fields_donor = {
+            "Пол (М/Ж)": ("combobox", ('М', 'Ж')),
+            "Дата рождения (ГГГГ-ММ-ДД)": ("entry", 10),
+            "Группа крови": ("combobox", ('O(I)', 'A(II)', 'B(III)', 'AB(IV)')),
+            "Резус-фактор": ("combobox", ('+', '-')),
+            "Дети (Да/Нет)": ("combobox", ('Да', 'Нет')),
+            "Рост (см)": ("entry", 5),
+            "Вес (кг)": ("entry", 5),
+            "Национальность": ("combobox", ('Русский', 'Украинец','Белорус')),
+            "Цвет волос": ("combobox", ('Блондин', 'Брюнет','Шатен')),
+            "Волосы (тип)": ("combobox", ('Прямые', 'Вьющиеся')),
+            "Разрез глаз": ("combobox", ('Прямой', 'Раскосый')),
+            "Цвет глаз": ("combobox", ('Зеленые', 'Серные')),
+            "Нос (форма)": ("combobox", ('Прямые', 'Вьющиеся')),
+            "Овал лица": ("combobox", ('Круглое', 'Полное')),
+            "Лоб": ("combobox", ('Широкий', 'Узкий')),
+            "Телосложение": ("combobox", ('Нормальное', 'Рахитическое')),
+            "Размер одежды": ("entry", 10),
+            "Размер обуви": ("entry", 10),
+            "Образование": ("combobox", ('Высшее', 'Среднее')),
+            "Профессия": ("entry", 50),
+            "Наличие стигм (Да/Нет)": ("combobox", ('Да', 'Нет')),
+        }
+        
+        row_count = 0
+        for label_text, (widget_type, params) in fields_donor.items():
+            
+             tk.Label(donor_tab, text=label_text).grid(row=row_count, column=0, sticky="e", padx=5, pady=2)
+             
+             if widget_type == "entry":
+                 entry_var = tk.StringVar()
+                 entry = tk.Entry(donor_tab, textvariable=entry_var, width=params)
+                 
+                 # Добавляем маску для даты рождения
+                 if label_text == "Дата рождения (ГГГГ-ММ-ДД)":
+                     entry.bind('<KeyRelease>', self.on_date_input)
+                     
+                 entry.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
+                 self.entries[label_text] = entry_var
+                 
+             elif widget_type == "combobox":
+                 combo_var = tk.StringVar()
+                 combo = ttk.Combobox(donor_tab, textvariable=combo_var, values=params, state='readonly')
+                 combo.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
+                 self.entries[label_text] = combo_var
+                 
+             row_count += 1
+
+         # Кнопка сохранения данных донора
+        ttk.Button(donor_tab, text="Сохранить изменения донора", command=self.save_donor_changes).grid(row=row_count, column=0, columnspan=2, pady=15)
+         
+        tab_control.add(donor_tab, text='Данные донора')
+         
+         # --- Вкладка 2: Биоматериалы ---
+        bio_tab = ttk.Frame(tab_control)
+         
+         # Таблица биоматериалов
+        bio_columns = ["id_bio", "Наименование", "Дата получения", "Срок годности", "Тип"]
+        self.bio_tree = ttk.Treeview(bio_tab, columns=bio_columns, show="headings")
+         
+        for col in bio_columns:
+             self.bio_tree.heading(col, text=col)
+             if col == "id_bio":
+                 self.bio_tree.column(col, width=40, anchor='center')
+             else:
+                 self.bio_tree.column(col, width=150)
+         
+        self.bio_tree.pack(fill='both', expand=True, padx=10, pady=5)
+         
+         # Кнопки управления биоматериалами
+        bio_btn_frame = tk.Frame(bio_tab)
+        bio_btn_frame.pack(pady=5)
+         
+        ttk.Button(bio_btn_frame,
+                   text="Добавить биоматериал",
+                   command=self.add_new_bio).pack(side='left', padx=5)
+                   
+        ttk.Button(bio_btn_frame,
+                   text="Редактировать биоматериал",
+                   command=self.edit_selected_bio).pack(side='left', padx=5)
+                   
+        ttk.Button(bio_btn_frame,
+                   text="Удалить биоматериал",
+                   command=self.delete_selected_bio).pack(side='left', padx=5)
+                   
+        tab_control.add(bio_tab, text='Биоматериалы')
+        tab_control.pack(expand=True, fill='both')
+         
+         # Заполнение полей данными
+        self.populate_donor_data(donor_data)
+        self.load_biological_materials()
+
+    def populate_donor_data(self, data):
+        """Заполняет поля окна данными из базы данных."""
+        mapping = {
+            "Пол (М/Ж)": data[1],
+            "Дата рождения (ГГГГ-ММ-ДД)": data[2],
+            "Группа крови": data[3],
+            "Резус-фактор": data[4],
+            "Дети (Да/Нет)": "Да" if data[5] else "Нет",
+            "Рост (см)": str(data[6]) if data[6] != 0 else "",
+            "Вес (кг)": str(data[7]) if data[7] != 0 else "",
+            "Национальность": data[8],
+            "Цвет волос": data[9],
+            "Волосы (тип)": data[10],
+            "Разрез глаз": data[11],
+            "Цвет глаз": data[12],
+            "Нос (форма)": data[13],
+            "Овал лица": data[14],
+            "Лоб": data[15],
+            "Телосложение": data[16],
+            "Размер одежды": data[17],
+            "Размер обуви": data[18],
+            "Образование": data[19],
+            "Профессия": data[20],
+             "Наличие стигм (Да/Нет)": "Да" if data[21] else "Нет"
+        }
+        
+        for field_name, value in mapping.items():
+             if field_name in self.entries:
+                 self.entries[field_name].set(value)
+
+    def on_date_input(self, event):
+       """Форматирует ввод в поле даты по маске ГГГГ-ММ-ДД."""
+       widget = event.widget
+       current_text = widget.get()
+       digits = ''.join(filter(str.isdigit, current_text))
+       
+       new_text = ""
+       if len(digits) > 4:
+           new_text = f"{digits[:4]}-"
+           if len(digits) > 6:
+               new_text += f"{digits[4:6]}-{digits[6:8]}"
+           else:
+               new_text += f"{digits[4:6]}"
+       elif len(digits) > 0:
+           new_text = digits[:4]
+
+       new_text = new_text[:10]
+
+       if current_text != new_text:
+           widget.delete(0, tk.END)
+           widget.insert(0, new_text)
+
+       cursor_pos = widget.index(tk.INSERT)
+       if cursor_pos < len(new_text):
+           next_char = new_text[cursor_pos] if cursor_pos < len(new_text) else None
+           if next_char == '-':
+               widget.icursor(cursor_pos + 1)
+           elif cursor_pos == 4 and len(new_text) > 5:
+               widget.icursor(5)
+           elif cursor_pos == 7 and len(new_text) > 8:
+               widget.icursor(8)
+
+    def save_donor_changes(self):
+       """Сохраняет измененные данные донора в БД."""
+       db = DatabaseConnection(DB_CONFIG)
+       
+       # Собираем данные из полей
+       data = {field: var.get() for field, var in self.entries.items()}
+       
+       children = data['Дети (Да/Нет)'] == 'Да'
+       stigma = data['Наличие стигм (Да/Нет)'] == 'Да'
+       
+       height = int(data['Рост (см)']) if data['Рост (см)'].strip() != "" else 0
+       weight = int(data['Вес (кг)']) if data['Вес (кг)'].strip() != "" else 0
+
+       query = """
+           UPDATE donors SET 
+               sex=%s, birth_date=%s, blood_group=%s, rh_factor=%s,
+               children=%s, height=%s, weight=%s,
+               nationality=%s, hair_color=%s, hair_type=%s,
+               eye_shape=%s, eye_color=%s, nose_shape=%s,
+               face_shape=%s, forehead_shape=%s,
+               body_type=%s, clothing_size=%s, shoe_size=%s,
+               education=%s, profession=%s,
+               stigma=%s
+           WHERE id=%s;
+       """
+       
+       params = (
+           data['Пол (М/Ж)'], data['Дата рождения (ГГГГ-ММ-ДД)'], data['Группа крови'], data['Резус-фактор'],
+           children, height, weight,
+           data['Национальность'], data['Цвет волос'], data['Волосы (тип)'],
+           data['Разрез глаз'], data['Цвет глаз'], data['Нос (форма)'],
+           data['Овал лица'], data['Лоб'],
+           data['Телосложение'], data['Размер одежды'], data['Размер обуви'],
+           data['Образование'], data['Профессия'],
+           stigma,
+           self.donor_id
+       )
+       
+       success = db.execute_update(query, params)
+       
+       if success:
+           messagebox.showinfo("Успех", "Данные донора успешно обновлены!")
+           self.load_biological_materials() # Обновляем список материалов после сохранения
+
+    def load_biological_materials(self):
+       """Загружает список биоматериалов для текущего донора в таблицу."""
+       self.bio_tree.delete(*self.bio_tree.get_children())
+       
+       db = DatabaseConnection(DB_CONFIG)
+       
+       result = db.execute_query(
+           """SELECT id AS id_bio, name_bio AS "Наименование", date_i AS "Дата получения", 
+                  date_end AS "Срок годности", material_type AS "Тип"
+              FROM biological_materials 
+              WHERE id_donor = %s""",
+           (self.donor_id,)
+       )
+       
+       if result:
+           for row in result:
+               self.bio_tree.insert("", "end", values=row)
+
+    def add_new_bio(self):
+        """Открывает окно добавления нового биоматериала для этого донора."""
+        AddBioWindow(self.donor_id)
+        self.load_biological_materials() # Обновляем список после добавления
+
+    def edit_selected_bio(self):
+        """Открывает окно редактирования выбранного биоматериала."""
+        selected_item = self.bio_tree.selection()
+        
+        if not selected_item:
+             messagebox.showwarning("Предупреждение", "Пожалуйста, выберите биоматериал из списка.")
+             return
+
+        bio_id = self.bio_tree.item(selected_item[0])['values'][0]
+        
+        EditBioWindow(self.donor_id, bio_id)
+        self.load_biological_materials() # Обновляем список после редактирования
+
+    def delete_selected_bio(self):
+        """Удаляет выбранный биоматериал."""
+        selected_item = self.bio_tree.selection()
+        
+        if not selected_item:
+             messagebox.showwarning("Предупреждение", "Пожалуйста, выберите биоматериал из списка.")
+             return
+
+        bio_id = self.bio_tree.item(selected_item[0])['values'][0]
+        
+        confirm = messagebox.askyesno("Подтверждение удаления", 
+                                     f"Вы уверены, что хотите удалить биоматериал ID: {bio_id}?")
+        
+        if confirm:
+             db = DatabaseConnection(DB_CONFIG)
+             success = db.execute_update("DELETE FROM biological_materials WHERE id = %s", (bio_id,))
+             
+             if success:
+                 messagebox.showinfo("Успех", "Биоматериал удален.")
+                 self.load_biological_materials()
 
 if __name__ == "__main__":
     app = AuthWindow()
