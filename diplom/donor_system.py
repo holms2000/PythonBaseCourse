@@ -821,7 +821,33 @@ class SearchWindow(tk.Toplevel):
            self.search_vars['material_type'].get().strip()
        ])
        
-       select_cols = ", ".join([f"d.{col}" for col in self.columns_db])
+       #select_cols = ", ".join([f"d.{col}" for col in self.columns_db])
+       
+       select_cols = """
+           d.id,
+           d.sex,
+           d.birth_date,
+           d.blood_group,
+           d.rh_factor,
+           CASE WHEN d.children THEN 'Да' ELSE 'Нет' END AS children,
+           d.height,
+           d.weight,
+           d.nationality,
+           d.hair_color,
+           d.hair_type,
+           d.eye_shape,
+           d.eye_color,
+           d.nose_shape,
+           d.face_shape,
+           d.forehead_shape,
+           d.body_type,
+           d.clothing_size,
+           d.shoe_size,
+           d.education,
+           d.profession,
+           CASE WHEN d.stigma THEN 'Да' ELSE 'Нет' END AS stigma
+       """
+       
        from_table = "donors d"
        
        conditions = []
@@ -1479,13 +1505,17 @@ class DonorDetailsWindow(tk.Toplevel):
         bio_tab = ttk.Frame(tab_control)
          
          # Таблица биоматериалов
-        bio_columns = ["id_bio", "Наименование", "Дата получения", "Срок годности", "Тип"]
+        bio_columns = ["id_bio", "Наименование", "Дата получения", "Срок годности", "Тип", "Количество", "Единицы"]
         self.bio_tree = ttk.Treeview(bio_tab, columns=bio_columns, show="headings")
          
         for col in bio_columns:
              self.bio_tree.heading(col, text=col)
              if col == "id_bio":
                  self.bio_tree.column(col, width=40, anchor='center')
+             elif col in ["Количество"]:
+                 self.bio_tree.column(col, width=80, anchor='center')
+             elif col in ["Единицы"]:
+                 self.bio_tree.column(col, width=60, anchor='center')
              else:
                  self.bio_tree.column(col, width=150)
          
@@ -1645,7 +1675,8 @@ class DonorDetailsWindow(tk.Toplevel):
        
        result = db.execute_query(
            """SELECT id AS id_bio, name_bio AS "Наименование", date_i AS "Дата получения", 
-                  date_end AS "Срок годности", material_type AS "Тип"
+                  date_end AS "Срок годности", material_type AS "Тип",
+                  quantity AS "Количество", unit AS "Единицы"
               FROM biological_materials 
               WHERE id_donor = %s""",
            (self.donor_id,)
