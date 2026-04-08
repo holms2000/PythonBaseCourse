@@ -1063,98 +1063,161 @@ class EditBioWindow(tk.Toplevel):
             self.destroy()
             return
             
-        current_data = result[0]  # Получаем кортеж с данными
+        current_data = result[0]
 
-        # --- Поля формы ---
-        fields_bio = {
-            "Наименование биоматериала": ("entry", 40),
-            "Дата получения (ГГГГ-ММ-ДД)": ("entry", 10),
-            "Срок годности (ГГГГ-ММ-ДД)": ("entry", 10),
-            "Тип материала": ("entry", 30),
-            "Количество материала": ("entry", 10),
-            "Единицы измерения": ("entry", 10),
-        }
+        # --- Инициализация переменных ---
+        self.name_bio_var = tk.StringVar()
+        self.date_i_var = tk.StringVar()
+        self.date_end_var = tk.StringVar()
+        self.material_type_var = tk.StringVar()
+        self.quantity_var = tk.StringVar()
+        self.unit_var = tk.StringVar()
+        self.genetic_passport_var = tk.BooleanVar()
+
+        # Списки значений для Combobox
+        self.bio_types = ("сперма", "ооцит", "эмбрион")
+        self.material_types = ("крио", "нативный")
+        self.units = ("ед", "мл")
+
+        # --- Создание интерфейса ---
+        # Фрейм для полей ввода (левая часть окна)
+        form_frame = tk.Frame(self)
+        form_frame.pack(padx=10, pady=10, fill='x')
 
         row_count = 0
-        self.entries = {}
 
-        # Заполняем поля, используя имена колонок из запроса для корректного сопоставления
-        for label_text, (widget_type, params) in fields_bio.items():
-            tk.Label(self, text=label_text).grid(row=row_count, column=0, sticky="e", padx=5, pady=2)
-            
-            entry_var = tk.StringVar()
-            
-            # Устанавливаем текущее значение из базы данных
-            # current_data - это кортеж: (name_bio, date_i, date_end, material_type, quantity, unit, genetic_passport)
-            if label_text == "Наименование биоматериала":
-                entry_var.set(current_data[0])
-            elif label_text == "Дата получения (ГГГГ-ММ-ДД)":
-                entry_var.set(current_data[1])
-            elif label_text == "Срок годности (ГГГГ-ММ-ДД)":
-                entry_var.set(current_data[2])
-            elif label_text == "Тип материала":
-                entry_var.set(current_data[3])
-            elif label_text == "Количество материала":
-                entry_var.set(str(current_data[4]))
-            elif label_text == "Единицы измерения":
-                entry_var.set(current_data[5])
-
-            entry = tk.Entry(self, textvariable=entry_var, width=params)
-            
-            # Добавляем маску для полей даты
-            if "Дата" in label_text:
-                entry.bind('<KeyRelease>', self.on_date_input)
-                
-            entry.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
-            self.entries[label_text] = entry_var
-            
-            row_count += 1
-
-        # Флаг генетического паспорта
-        tk.Label(self, text="Генетический паспорт").grid(row=row_count, column=0, sticky="e", padx=5, pady=10)
-        self.genetic_passport_var = tk.BooleanVar()
-        
-        # Загружаем значение флага из БД (индекс 6 в кортеже)
-        if current_data[6]:
-             self.genetic_passport_var.set(True)
-             
-        ttk.Checkbutton(self, variable=self.genetic_passport_var).grid(row=row_count, column=1, sticky="w")
-        
+        # Поля формы (используем grid внутри form_frame)
+        tk.Label(form_frame, text="Наименование:").grid(row=row_count, column=0, sticky="e", pady=2)
+        ttk.Combobox(form_frame, textvariable=self.name_bio_var,
+                    values=self.bio_types, state='readonly', width=30).grid(row=row_count, column=1, sticky="w", pady=2)
         row_count += 1
 
-        ttk.Button(self,
-                  text="Сохранить изменения и закрыть",
-                  command=self.save_and_close).grid(row=row_count + 1, column=0, columnspan=2, pady=15)
+        tk.Label(form_frame, text="Дата получения:").grid(row=row_count, column=0, sticky="e", pady=2)
+        tk.Entry(form_frame, textvariable=self.date_i_var, width=32).grid(row=row_count, column=1, sticky="w", pady=2)
+        row_count += 1
+
+        tk.Label(form_frame, text="Срок годности:").grid(row=row_count, column=0, sticky="e", pady=2)
+        tk.Entry(form_frame, textvariable=self.date_end_var, width=32).grid(row=row_count, column=1, sticky="w", pady=2)
+        row_count += 1
+
+        tk.Label(form_frame, text="Тип материала:").grid(row=row_count, column=0, sticky="e", pady=2)
+        ttk.Combobox(form_frame, textvariable=self.material_type_var,
+                     values=self.material_types, state='readonly', width=30).grid(row=row_count, column=1, sticky="w", pady=2)
+        row_count += 1
+
+        tk.Label(form_frame, text="Количество:").grid(row=row_count, column=0, sticky="e", pady=2)
+        tk.Entry(form_frame, textvariable=self.quantity_var, width=32).grid(row=row_count, column=1, sticky="w", pady=2)
+        row_count += 1
+
+        tk.Label(form_frame, text="Единицы:").grid(row=row_count, column=0, sticky="e", pady=(2, 10))
+        ttk.Combobox(form_frame, textvariable=self.unit_var,
+                     values=self.units, state='readonly', width=30).grid(row=row_count, column=1, sticky="w", pady=(2, 10))
+
+         # Привязываем маску для дат после создания виджетов
+        for child in form_frame.winfo_children():
+             if isinstance(child, tk.Entry):
+                 child.bind('<KeyRelease>', self.on_date_input)
+
+         # Фрейм для нижней части (чекбокс, кнопка, статус)
+        bottom_frame = tk.Frame(self)
+        bottom_frame.pack(padx=10, pady=(0, 10), fill='x')
+
+         # 1. Чекбокс (Генетический паспорт)
+        self.genetic_passport_check = ttk.Checkbutton(bottom_frame,
+                                                      text="Генетический паспорт",
+                                                      variable=self.genetic_passport_var)
+        self.genetic_passport_check.pack(anchor='w', pady=(0, 5))
+
+         # 2. Кнопка сохранения
+        self.save_button = ttk.Button(bottom_frame,
+                   text="Сохранить изменения и закрыть",
+                   command=self.save_and_close)
+        self.save_button.pack(fill='x', pady=(0, 5))
+
+         # 3. Статусная метка (выводится ПОД кнопкой)
+        self.save_status_label = tk.Label(bottom_frame, text="", fg="black")
+        self.save_status_label.pack(fill='x')
+         
+         # Заполнение данных из БД
+        self._populate_data(current_data)
+    
+    def _populate_data(self, data):
+        """Заполняет поля окна данными из базы данных."""
+        self.name_bio_var.set(data[0])
+        self.date_i_var.set(data[1])
+        self.date_end_var.set(data[2])
+        self.material_type_var.set(data[3])
+        
+        quantity_val = data[4]
+        self.quantity_var.set(str(quantity_val) if quantity_val is not None else "")
+         
+        self.unit_var.set(data[5])
+        
+        if data[6]:
+            self.genetic_passport_var.set(True)
     
     def on_date_input(self, event):
-        """Форматирует ввод в поле даты по маске ГГГГ-ММ-ДД."""
-        widget = event.widget
-        current_text = widget.get()
-        digits = ''.join(filter(str.isdigit, current_text))
-        
-        new_text = ""
-        if len(digits) > 4:
-            new_text = f"{digits[:4]}-{digits[4:6]}"
-            if len(digits) > 6:
-                new_text += f"-{digits[6:8]}"
-        elif len(digits) > 0:
-            new_text = digits[:4]
+       """Форматирует ввод в поле даты по маске ГГГГ-ММ-ДД."""
+       widget = event.widget
+       current_text = widget.get()
+       digits = ''.join(filter(str.isdigit, current_text))
+       
+       new_text = ""
+       if len(digits) > 4:
+           new_text = f"{digits[:4]}-{digits[4:6]}"
+           if len(digits) > 6:
+               new_text += f"-{digits[6:8]}"
+       elif len(digits) > 0:
+           new_text = digits[:4]
 
-        new_text = new_text[:10]
+       new_text = new_text[:10]
 
-        if current_text != new_text:
-            widget.delete(0, tk.END)
-            widget.insert(0, new_text)
+       if current_text != new_text:
+           widget.delete(0, tk.END)
+           widget.insert(0, new_text)
 
     def save_and_close(self):
        """Сохраняет измененные данные биоматериала в БД и закрывает окно."""
-       data = {field: var.get() for field, var in self.entries.items()}
+       
+       # Блокируем кнопку во время сохранения
+       self.save_button.config(state='disabled')
+       
+       # Очистка статуса перед началом операции
+       self.save_status_label.config(text="", fg="black")
 
-       required_fields = ['Наименование биоматериала', 'Дата получения (ГГГГ-ММ-ДД)', 'Срок годности (ГГГГ-ММ-ДД)', 'Количество материала']
-       for field in required_fields:
-           if not data.get(field):
-               messagebox.showerror("Ошибка заполнения", f"Поле '{field}' обязательно для заполнения.")
-               return
+       # Сбор данных напрямую из переменных (связанных с виджетами)
+       name_bio = self.name_bio_var.get()
+       date_i = self.date_i_var.get()
+       date_end = self.date_end_var.get()
+       material_type = self.material_type_var.get()
+       quantity_str = self.quantity_var.get()
+       unit = self.unit_var.get()
+
+       # Валидация: Проверка на пустые обязательные поля
+       required_fields = {
+           "Наименование биоматериала": name_bio,
+           "Дата получения": date_i,
+           "Срок годности": date_end,
+           "Количество материала": quantity_str
+       }
+       
+       missing_fields = [field for field in required_fields if not field.strip()]
+       
+       if missing_fields:
+           error_text = "⚠ Не заполнены обязательные поля: " + ", ".join(missing_fields)
+           self.save_status_label.config(text=error_text, fg="red")
+           self.save_button.config(state='normal') # Разблокируем кнопку при ошибке валидации
+           return
+
+       # Валидация количества материала (должно быть числом)
+       try:
+           quantity = float(quantity_str)
+           if quantity <= 0:
+               raise ValueError("Количество должно быть больше нуля.")
+       except ValueError:
+           self.save_status_label.config(text="❌ Ошибка: 'Количество' должно быть положительным числом.", fg="red")
+           self.save_button.config(state='normal')
+           return
 
        db = DatabaseConnection(DB_CONFIG)
        
@@ -1171,12 +1234,12 @@ class EditBioWindow(tk.Toplevel):
        """
        
        params_bio = (
-           data['Наименование биоматериала'],
-           data['Дата получения (ГГГГ-ММ-ДД)'],
-           data['Срок годности (ГГГГ-ММ-ДД)'],
-           data['Тип материала'],
-           float(data['Количество материала']),
-           data['Единицы измерения'],
+           name_bio,
+           date_i,
+           date_end,
+           material_type,
+           quantity,
+           unit,
            True if self.genetic_passport_var.get() else False,
            self.bio_id
        )
@@ -1184,9 +1247,14 @@ class EditBioWindow(tk.Toplevel):
        success = db.execute_update(query_bio, params_bio)
 
        if success:
-           messagebox.showinfo("Успех", "Данные биоматериала успешно обновлены!")
-           self.destroy()
-
+           self.save_status_label.config(text="✅ Данные успешно обновлены!", fg="green")
+           
+           # Небольшая задержка перед закрытием окна для прочтения сообщения
+           self.after(1500, self.destroy) 
+           
+       else:
+          self.save_status_label.config(text="❌ Не удалось сохранить данные в базу данных.", fg="red")
+          self.save_button.config(state='normal') # Разблокируем кнопку при ошибке БД
 class DonorDetailsWindow(tk.Toplevel):
     """Окно для просмотра и редактирования данных донора и его биоматериалов."""
     def __init__(self, donor_id):
@@ -1268,7 +1336,12 @@ class DonorDetailsWindow(tk.Toplevel):
              row_count += 1
 
          # Кнопка сохранения данных донора
-        ttk.Button(donor_tab, text="Сохранить изменения донора", command=self.save_donor_changes).grid(row=row_count, column=0, columnspan=2, pady=15)
+        self.save_btn = ttk.Button(donor_tab, text="Сохранить изменения донора", command=self.save_donor_changes)
+        self.save_btn.grid(row=row_count, column=0, columnspan=2, pady=15)
+
+         # Статусная метка для вывода результата сохранения
+        self.save_status_label = tk.Label(donor_tab, text="", fg="black")
+        self.save_status_label.grid(row=row_count + 1, column=0, columnspan=2, pady=(5, 15))
          
         tab_control.add(donor_tab, text='Данные донора')
          
@@ -1380,11 +1453,26 @@ class DonorDetailsWindow(tk.Toplevel):
        # Собираем данные из полей
        data = {field: var.get() for field, var in self.entries.items()}
        
+       # Очистка статуса перед началом операции
+       self.save_status_label.config(text="", fg="black")
+
+       # Валидация: Проверка на пустые обязательные поля Роста и Веса
+       height_str = data['Рост (см)'].strip()
+       weight_str = data['Вес (кг)'].strip()
+       
+       if not height_str or not weight_str:
+           self.save_status_label.config(text="⚠ Поля 'Рост' и 'Вес' обязательны для заполнения.", fg="red")
+           return
+
+       try:
+           height = int(height_str)
+           weight = int(weight_str)
+       except ValueError:
+           self.save_status_label.config(text="⚠ Поля 'Рост' и 'Вес' должны содержать только цифры.", fg="red")
+           return
+
        children = data['Дети (Да/Нет)'] == 'Да'
        stigma = data['Наличие стигм (Да/Нет)'] == 'Да'
-       
-       height = int(data['Рост (см)']) if data['Рост (см)'].strip() != "" else 0
-       weight = int(data['Вес (кг)']) if data['Вес (кг)'].strip() != "" else 0
 
        query = """
            UPDATE donors SET 
@@ -1414,8 +1502,10 @@ class DonorDetailsWindow(tk.Toplevel):
        success = db.execute_update(query, params)
        
        if success:
-           messagebox.showinfo("Успех", "Данные донора успешно обновлены!")
+           self.save_status_label.config(text="✅ Данные донора успешно обновлены!", fg="green")
            self.load_biological_materials() # Обновляем список материалов после сохранения
+       else:
+          self.save_status_label.config(text="❌ Не удалось сохранить данные в базу данных.", fg="red")
 
     def load_biological_materials(self):
        """Загружает список биоматериалов для текущего донора в таблицу."""
