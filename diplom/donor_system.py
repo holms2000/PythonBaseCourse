@@ -50,7 +50,7 @@ class DatabaseConnection:
             print(f"Сообщение: {e}")  # <-- ЭТО ТО, ЧТО НАМ НУЖНО
             print(f"------------------------")
             
-            messagebox.showerror("Ошибка БД", str(e))
+            messagebox.showerror("Ошибка БД", str(e),parent=self)
             return None
             
     def execute_update(self, query, params=None):
@@ -62,7 +62,7 @@ class DatabaseConnection:
                     conn.commit()
                     return True
         except Exception as e:
-            messagebox.showerror("Ошибка БД", str(e))
+            messagebox.showerror("Ошибка БД", str(e),parent=self)
             return False
 
 
@@ -109,7 +109,7 @@ class AuthWindow(tk.Tk):
        password = self.pass_entry.get()
     
        if not login or not password:
-           messagebox.showwarning("Ошибка", "Заполните все поля")
+           messagebox.showwarning("Ошибка", "Заполните все поля",parent=self)
            return
 
        password_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -122,10 +122,10 @@ class AuthWindow(tk.Tk):
        )
 
        if result is None:
-           messagebox.showerror("Ошибка", "Не удалось выполнить запрос к базе данных.")
+           messagebox.showerror("Ошибка", "Не удалось выполнить запрос к базе данных.",parent=self)
     
        elif not result: 
-           messagebox.showerror("Ошибка", "Неверный логин или пароль")
+           messagebox.showerror("Ошибка", "Неверный логин или пароль",parent=self)
     
        else:
             self.current_user_id = result[0][0]
@@ -891,7 +891,7 @@ class SearchWindow(tk.Toplevel):
                self.search_status_label.grid_remove()
                
        except Exception as e:
-           messagebox.showerror("Ошибка поиска", str(e))
+           messagebox.showerror("Ошибка поиска", str(e),parent=self)
 
 
     def add_bio_for_selected(self):
@@ -902,7 +902,7 @@ class SearchWindow(tk.Toplevel):
       selected_item = self.tree.selection()
       
       if not selected_item:
-          messagebox.showwarning("Предупреждение", "Пожалуйста, выберите донора из списка.")
+          messagebox.showwarning("Предупреждение", "Пожалуйста, выберите донора из списка.",parent=self)
           return
 
       donor_id = self.tree.item(selected_item[0])['values'][0]
@@ -926,85 +926,140 @@ class AddBioWindow(tk.Toplevel):
     def __init__(self, donor_id):
         super().__init__()
         self.title(f"Добавление биоматериала для донора ID: {donor_id}")
-        self.geometry("650x350")
+        self.geometry("650x400")  # Увеличена высота для статусного сообщения
         
-        # Сохраняем ID донора как атрибут класса
         self.donor_id = donor_id 
 
+        # --- Словари значений для Combobox ---
+        self.bio_types = ("сперма", "ооцит", "эмбрион")
+        self.material_types = ("крио", "нативный")
+        self.units = ("ед", "мл")
+
+        # --- Инициализация Notebook (Вкладок) ---
+        # Создаем блокнот и вкладку сразу, так как донор уже существует
+        self.tab_control = ttk.Notebook(self)
+        self.bio_tab = ttk.Frame(self.tab_control)
+        self.tab_control.add(self.bio_tab, text='Данные биоматериала')
+
         # --- Поля биоматериала ---
-        self.bio_entries = {} # Словарь для хранения переменных полей
+        # Словарь для хранения переменных полей
+        self.bio_entries = {}
 
         fields_bio = {
-            "Наименование биоматериала": ("entry", 40),
+            "Наименование биоматериала": ("combobox", self.bio_types),
             "Дата получения (ГГГГ-ММ-ДД)": ("entry", 10),
             "Срок годности (ГГГГ-ММ-ДД)": ("entry", 10),
-            "Тип материала": ("entry", 30),
+            "Тип материала": ("combobox", self.material_types),
             "Количество материала": ("entry", 10),
-            "Единицы измерения": ("entry", 10),
+            "Единицы измерения": ("combobox", self.units),
         }
 
         row_count = 0
         for label_text, (widget_type, params) in fields_bio.items():
-            tk.Label(self, text=label_text).grid(row=row_count, column=0, sticky="e", padx=5, pady=2)
+            tk.Label(self.bio_tab, text=label_text).grid(row=row_count, column=0, sticky="e", padx=5, pady=2)
             
             if widget_type == "entry":
                 entry_var = tk.StringVar()
-                entry = tk.Entry(self, textvariable=entry_var, width=params)
-                
-                # Добавляем маску для полей даты
+                entry = tk.Entry(self.bio_tab, textvariable=entry_var, width=params)
+                # Привязываем маску для дат
                 if "Дата" in label_text:
                     entry.bind('<KeyRelease>', self.on_date_input)
-                    
                 entry.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
                 self.bio_entries[label_text] = entry_var
+                
+            elif widget_type == "combobox":
+                combo_var = tk.StringVar()
+                combo = ttk.Combobox(self.bio_tab, textvariable=combo_var, values=params, state='readonly')
+                combo.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
+                self.bio_entries[label_text] = combo_var
                 
             row_count += 1
 
         # Флаг генетического паспорта
-        tk.Label(self, text="Генетический паспорт").grid(row=row_count, column=0, sticky="e", padx=5, pady=10)
+        tk.Label(self.bio_tab, text="Генетический паспорт").grid(row=row_count, column=0, sticky="e", padx=5, pady=10)
         self.bio_genetic_passport_var = tk.BooleanVar()
-        ttk.Checkbutton(self, variable=self.bio_genetic_passport_var).grid(row=row_count, column=1, sticky="w")
+        ttk.Checkbutton(self.bio_tab, variable=self.bio_genetic_passport_var).grid(row=row_count, column=1, sticky="w")
         
         row_count += 1
 
-        # --- ФИКС: Используем новый метод save_and_close ---
-        ttk.Button(self,
-                  text="Сохранить биоматериал и закрыть окно",
-                  command=self.save_and_close).grid(row=row_count, column=0, columnspan=2, pady=15)
-         
-    def on_date_input(self, event):
-        """Форматирует ввод в поле даты по маске ГГГГ-ММ-ДД."""
-        widget = event.widget
-        current_text = widget.get()
-        digits = ''.join(filter(str.isdigit, current_text))
+        # --- Статусное поле для вывода сообщений ---
+        self.save_status_label = tk.Label(self.bio_tab, text="", fg="black", justify='left')
+        self.save_status_label.grid(row=row_count, column=0, columnspan=2, pady=(10, 0), sticky="w")
         
-        new_text = ""
-        if len(digits) > 4:
-            new_text = f"{digits[:4]}-{digits[4:6]}"
-            if len(digits) > 6:
-                new_text += f"-{digits[6:8]}"
-        elif len(digits) > 0:
-            new_text = digits[:4]
+        # --- Кнопка сохранения ---
+        ttk.Button(self.bio_tab,
+                  text="Сохранить биоматериал",
+                  command=self.save_and_close).grid(row=row_count + 1, column=0, columnspan=2, pady=(5, 20))
+        
+        # Размещаем Notebook в окне после добавления всех элементов
+        self.tab_control.pack(expand=True, fill='both')
 
-        new_text = new_text[:10]
+    def on_date_input(self, event):
+       """Форматирует ввод в поле даты по маске ГГГГ-ММ-ДД."""
+       widget = event.widget
+       current_text = widget.get()
+       digits = ''.join(filter(str.isdigit, current_text))
+       
+       new_text = ""
+       if len(digits) > 4:
+           new_text = f"{digits[:4]}-"
+           if len(digits) > 6:
+               new_text += f"{digits[4:6]}-{digits[6:8]}"
+           else:
+               new_text += f"{digits[4:6]}"
+       elif len(digits) > 0:
+           new_text = digits[:4]
 
-        if current_text != new_text:
-            widget.delete(0, tk.END)
-            widget.insert(0, new_text)
+       new_text = new_text[:10]
 
-        cursor_pos = widget.index(tk.INSERT)
-        if cursor_pos < len(new_text) and new_text[cursor_pos] == '-':
-            widget.icursor(cursor_pos + 1)
+       if current_text != new_text:
+           widget.delete(0, tk.END)
+           widget.insert(0, new_text)
+
+       cursor_pos = widget.index(tk.INSERT)
+       if cursor_pos < len(new_text):
+           next_char = new_text[cursor_pos] if cursor_pos < len(new_text) else None
+           if next_char == '-':
+               widget.icursor(cursor_pos + 1)
+           elif cursor_pos == 4 and len(new_text) > 5:
+               widget.icursor(5)
+           elif cursor_pos == 7 and len(new_text) > 8:
+               widget.icursor(8)
             
     def save_and_close(self):
        """Сохраняет данные биоматериала в БД и закрывает окно."""
-       data = {field: var.get() for field, var in self.bio_entries.items()}
+       # Очистка статуса перед началом операции
+       self.save_status_label.config(text="", fg="black")
 
-       required_fields = ['Наименование биоматериала', 'Дата получения (ГГГГ-ММ-ДД)', 'Срок годности (ГГГГ-ММ-ДД)', 'Количество материала']
-       for field in required_fields:
-           if not data.get(field):
-               messagebox.showerror("Ошибка заполнения", f"Поле '{field}' обязательно для заполнения.")
-               return
+       # Сбор данных из виджетов
+       data = {field: var.get() for field, var in self.bio_entries.items()}
+       data['date_i'] = data.get('Дата получения (ГГГГ-ММ-ДД)', '')
+       data['date_end'] = data.get('Срок годности (ГГГГ-ММ-ДД)', '')
+       data['quantity'] = data.get('Количество материала', '')
+
+       # Проверка обязательных полей
+       required_fields = {
+           'Наименование биоматериала': data.get('Наименование биоматериала'),
+           'Дата получения (ГГГГ-ММ-ДД)': data['date_i'],
+           'Срок годности (ГГГГ-ММ-ДД)': data['date_end'],
+           'Количество материала': data['quantity']
+       }
+       
+       missing_fields = [field for field, value in required_fields.items() if not value.strip()]
+       
+       if missing_fields:
+           error_text = "⚠ Не заполнены обязательные поля: " + ", ".join(missing_fields)
+           self.save_status_label.config(text=error_text, fg="red")
+           return
+
+       # Валидация количества материала (должно быть числом)
+       try:
+           quantity = float(data['quantity'])
+           if quantity <= 0:
+               raise ValueError("Количество должно быть больше нуля.")
+       except ValueError:
+           self.save_status_label.config(text="❌ Ошибка: 'Количество материала' должно быть положительным числом.", fg="red")
+           return
 
        db = DatabaseConnection(DB_CONFIG)
        
@@ -1015,27 +1070,37 @@ class AddBioWindow(tk.Toplevel):
                material_type,
                quantity,
                unit,
-               material_status,
                genetic_passport
-           ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s);
+           ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s);
        """
        
        params_bio = (
            self.donor_id,
            data['Наименование биоматериала'],
-           data['Дата получения (ГГГГ-ММ-ДД)'],
-           data['Срок годности (ГГГГ-ММ-ДД)'],
+           data['date_i'],
+           data['date_end'],
            data['Тип материала'],
-           float(data['Количество материала']),
+           float(data['quantity']),
            data['Единицы измерения'],
            True if self.bio_genetic_passport_var.get() else False
        )
        
-       success = db.execute_update(query_bio, params_bio)
+       try:
+           success = db.execute_update(query_bio, params_bio)
+           
+           if success:
+               self.save_status_label.config(text="✅ Данные успешно сохранены!", fg="green")
+               
+               # --- Обновляем список в родительском окне ---
+               if hasattr(self, 'parent') and hasattr(self.parent, 'load_biological_materials'):
+                  self.parent.load_biological_materials()
 
-       if success:
-           messagebox.showinfo("Успех", "Данные биоматериала успешно сохранены!")
-           self.destroy()
+               # Закрываем окно через 1.5 секунды после успешного сохранения
+               self.after(1500, self.destroy)
+               
+       except Exception as e:
+           # Обработка непредвиденных ошибок БД (например, потеря соединения)
+           self.save_status_label.config(text=f"❌ Критическая ошибка: {str(e)}", fg="red")
 
 class EditBioWindow(tk.Toplevel):
     """Окно для редактирования существующего биоматериала."""
@@ -1059,7 +1124,7 @@ class EditBioWindow(tk.Toplevel):
         )
         
         if not result:
-            messagebox.showerror("Ошибка", "Биоматериал не найден.")
+            messagebox.showerror("Ошибка", "Биоматериал не найден.",parent=self)
             self.destroy()
             return
             
@@ -1249,6 +1314,10 @@ class EditBioWindow(tk.Toplevel):
        if success:
            self.save_status_label.config(text="✅ Данные успешно обновлены!", fg="green")
            
+           # Обновляем таблицу в родительском окне и устанавливаем фокус
+           if hasattr(self, 'parent') and hasattr(self.parent, 'load_biological_materials'):
+              self.parent.load_biological_materials()
+
            # Небольшая задержка перед закрытием окна для прочтения сообщения
            self.after(1500, self.destroy) 
            
@@ -1274,7 +1343,7 @@ class DonorDetailsWindow(tk.Toplevel):
         )
         
         if not donor_data:
-            messagebox.showerror("Ошибка", "Донор не найден.")
+            messagebox.showerror("Ошибка", "Донор не найден.",parent=self)
             self.destroy()
             return
             
@@ -1525,22 +1594,34 @@ class DonorDetailsWindow(tk.Toplevel):
            for row in result:
                self.bio_tree.insert("", "end", values=row)
 
+           # Устанавливаем фокус на первую запись
+           first_item = self.bio_tree.get_children()[0]
+           self.bio_tree.selection_set(first_item)
+           self.bio_tree.focus(first_item)
+
     def add_new_bio(self):
         """Открывает окно добавления нового биоматериала для этого донора."""
-        AddBioWindow(self.donor_id)
-        self.load_biological_materials() # Обновляем список после добавления
+        add_window = AddBioWindow(self.donor_id)
+        add_window.parent = self  # Передаем ссылку на текущее окно как родителя
+        #AddBioWindow(self.donor_id)
+        #self.load_biological_materials() # Обновляем список после добавления
 
     def edit_selected_bio(self):
         """Открывает окно редактирования выбранного биоматериала."""
         selected_item = self.bio_tree.selection()
         
         if not selected_item:
-             messagebox.showwarning("Предупреждение", "Пожалуйста, выберите биоматериал из списка.")
+             messagebox.showwarning("Предупреждение", "Пожалуйста, выберите биоматериал из списка.",parent=self)
              return
 
         bio_id = self.bio_tree.item(selected_item[0])['values'][0]
         
-        EditBioWindow(self.donor_id, bio_id)
+        #EditBioWindow(self.donor_id, bio_id)
+
+        # Передаём self как parent
+        edit_window = EditBioWindow(self.donor_id, bio_id)
+        edit_window.parent = self  # Сохраняем ссылку на родителя
+
         self.load_biological_materials() # Обновляем список после редактирования
 
     def delete_selected_bio(self):
@@ -1548,20 +1629,20 @@ class DonorDetailsWindow(tk.Toplevel):
         selected_item = self.bio_tree.selection()
         
         if not selected_item:
-             messagebox.showwarning("Предупреждение", "Пожалуйста, выберите биоматериал из списка.")
+             messagebox.showwarning("Предупреждение", "Пожалуйста, выберите биоматериал из списка.",parent=self)
              return
 
         bio_id = self.bio_tree.item(selected_item[0])['values'][0]
         
         confirm = messagebox.askyesno("Подтверждение удаления", 
-                                     f"Вы уверены, что хотите удалить биоматериал ID: {bio_id}?")
+                                     f"Вы уверены, что хотите удалить биоматериал ID: {bio_id}?",parent=self)
         
         if confirm:
              db = DatabaseConnection(DB_CONFIG)
              success = db.execute_update("DELETE FROM biological_materials WHERE id = %s", (bio_id,))
              
              if success:
-                 messagebox.showinfo("Успех", "Биоматериал удален.")
+                 messagebox.showinfo("Успех", "Биоматериал удален.",parent=self)
                  self.load_biological_materials()
 
 if __name__ == "__main__":
