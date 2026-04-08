@@ -523,7 +523,7 @@ class AddDonorWindow(tk.Toplevel):
        data = {field: var.get() for field, var in self.bio_entries.items()}
 
        # Проверка обязательных полей биоматериала с выводом под кнопкой
-       required_fields = ['Наименование биоматериала', 'Дата получения (ГГГГ-ММ-ДД)', 'Срок годности (ГГГГ-ММ-ДД)', 'Количество материала']
+       required_fields = ['Наименование биоматериала', 'Дата получения (ГГГГ-ММ-ДД)', 'Срок годности (ГГГГ-ММ-ДД)', 'Количество материала','Единицы измерения']
        missing_fields = [field for field in required_fields if not data.get(field)]
 
        if missing_fields:
@@ -748,6 +748,10 @@ class SearchWindow(tk.Toplevel):
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=5)
+        
+        ttk.Button(btn_frame,
+                   text="Удалить выбранного донора",
+                   command=self.delete_selected_donor).pack(side='left', padx=5)
 
         ttk.Button(btn_frame,
                    text="Добавить биоматериал для выбранного донора",
@@ -919,7 +923,61 @@ class SearchWindow(tk.Toplevel):
        donor_id = self.tree.item(selected_item[0])['values'][0]
         
        # Открываем новое окно для редактирования
-       DonorDetailsWindow(donor_id)  
+       DonorDetailsWindow(donor_id)
+
+    def delete_selected_donor(self):
+        """
+        Удаляет донора, выбранного в таблице результатов поиска,
+        вместе со всеми его связанными биоматериалами.
+        """
+        selected_item = self.tree.selection()
+        
+        if not selected_item:
+            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите донора из списка.", parent=self)
+            return
+
+        # Получаем ID донора и его ФИО (или логин) для отображения в диалоге
+        donor_values = self.tree.item(selected_item[0])['values']
+        donor_id = donor_values[0]
+        
+        # Попытка получить ФИО или логин для наглядности (если есть в таблице)
+        # В вашем текущем коде отображается только ID. Если хотите ФИО, нужно изменить SQL-запрос в perform_search.
+        donor_info = f"ID: {donor_id}"
+
+        # Запрос подтверждения перед удалением
+        confirm = messagebox.askyesno(
+            "Подтверждение удаления",
+            f"Вы уверены, что хотите удалить донора {donor_info}?\n"
+            "Все связанные с ним биоматериалы также будут безвозвратно удалены.",
+            parent=self
+        )
+        
+        if not confirm:
+            return # Пользователь отменил операцию
+
+        db = DatabaseConnection(DB_CONFIG)
+        
+        try:
+            # Использование ON DELETE CASCADE в БД — самый надежный способ.
+            # Если каскадное удаление настроено на уровне БД, достаточно одной команды.
+            # Если нет — нужно удалять из двух таблиц по очереди.
+            
+            # Вариант 1: Если в БД настроено ON DELETE CASCADE для foreign key:
+            success = db.execute_update("DELETE FROM donors WHERE id = %s", (donor_id,))
+            
+            # Вариант 2: Если каскада нет (менее предпочтительно):
+            # db.execute_update("DELETE FROM biological_materials WHERE id_donor = %s", (donor_id,))
+            # success = db.execute_update("DELETE FROM donors WHERE id = %s", (donor_id,))
+
+            if success:
+                messagebox.showinfo("Успех", f"Донор {donor_info} и его материалы удалены.", parent=self)
+                # Обновляем таблицу после удаления
+                self.perform_search()
+            else:
+                messagebox.showerror("Ошибка", "Не удалось удалить данные.", parent=self)
+
+        except Exception as e:
+            messagebox.showerror("Ошибка БД", str(e), parent=self)  
 
 class AddBioWindow(tk.Toplevel):
     """Окно для добавления биоматериала к существующему донору."""
@@ -962,7 +1020,7 @@ class AddBioWindow(tk.Toplevel):
                 entry_var = tk.StringVar()
                 entry = tk.Entry(self.bio_tab, textvariable=entry_var, width=params)
                 # Привязываем маску для дат
-                if "Дата" in label_text:
+                if "Дата" in label_text or "Срок" in label_text:
                     entry.bind('<KeyRelease>', self.on_date_input)
                 entry.grid(row=row_count, column=1, sticky="w", padx=5, pady=2)
                 self.bio_entries[label_text] = entry_var
@@ -1036,13 +1094,15 @@ class AddBioWindow(tk.Toplevel):
        data['date_i'] = data.get('Дата получения (ГГГГ-ММ-ДД)', '')
        data['date_end'] = data.get('Срок годности (ГГГГ-ММ-ДД)', '')
        data['quantity'] = data.get('Количество материала', '')
+       data['units'] = data.get('Единицы измерения', '')
 
        # Проверка обязательных полей
        required_fields = {
            'Наименование биоматериала': data.get('Наименование биоматериала'),
            'Дата получения (ГГГГ-ММ-ДД)': data['date_i'],
            'Срок годности (ГГГГ-ММ-ДД)': data['date_end'],
-           'Количество материала': data['quantity']
+           'Количество материала': data['quantity'],
+           'Единицы измерения': data['units']
        }
        
        missing_fields = [field for field, value in required_fields.items() if not value.strip()]
@@ -1263,7 +1323,8 @@ class EditBioWindow(tk.Toplevel):
            "Наименование биоматериала": name_bio,
            "Дата получения": date_i,
            "Срок годности": date_end,
-           "Количество материала": quantity_str
+           "Количество материала": quantity_str,
+           "Единицы измерения":unit
        }
        
        missing_fields = [field for field in required_fields if not field.strip()]
