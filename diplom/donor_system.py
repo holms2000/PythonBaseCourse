@@ -42,12 +42,12 @@ class DatabaseConnection:
                     conn.commit()
                     return cursor.fetchall()
         except Exception as e:
-            # Это покажет полную ошибку в терминале, где вы запускаете скрипт
+            # Это показывает полную ошибку в терминале, где запускается скрипт
             print(f"--- ОШИБКА БАЗЫ ДАННЫХ ---")
             print(f"Запрос: {query}")
             print(f"Параметры: {params}")
             print(f"Тип ошибки: {type(e).__name__}")
-            print(f"Сообщение: {e}")  # <-- ЭТО ТО, ЧТО НАМ НУЖНО
+            print(f"Сообщение: {e}") 
             print(f"------------------------")
             
             messagebox.showerror("Ошибка БД", str(e),parent=self)
@@ -607,7 +607,7 @@ class SearchWindow(tk.Toplevel):
             "stigma": "Наличие стигм"
         }
 
-        # --- 2. ВОССТАНОВЛЕННЫЙ СЛОВАРЬ ЗНАЧЕНИЙ ДЛЯ COMBOBOX ---
+        # --- 2. СЛОВАРЬ ЗНАЧЕНИЙ ДЛЯ COMBOBOX ---
         self.combobox_values = {
             "sex": ('М', 'Ж'),
             "blood_group": ('O(I)', 'A(II)', 'B(III)', 'AB(IV)'),
@@ -617,7 +617,6 @@ class SearchWindow(tk.Toplevel):
             "hair_type": ('Прямые', 'Вьющиеся'),
             "eye_shape": ('Прямой', 'Раскосый'),
             "nationality": ('Русский', 'Украинец','Белорус'),
-            # Исправленные дубликаты для корректной работы словаря
             "eye_color": ('Зеленые', 'Серные'),
             "nose_shape": ('Прямые', 'Вьющиеся'),
             "face_shape": ('Круглое', 'Полное'),
@@ -1411,6 +1410,7 @@ class EditBioWindow(tk.Toplevel):
        else:
           self.save_status_label.config(text="❌ Не удалось сохранить данные в базу данных.", fg="red")
           self.save_button.config(state='normal') # Разблокируем кнопку при ошибке БД
+
 class DonorDetailsWindow(tk.Toplevel):
     """Окно для просмотра и редактирования данных донора и его биоматериалов."""
     def __init__(self, donor_id):
