@@ -65,6 +65,49 @@ class DatabaseConnection:
             messagebox.showerror("Ошибка БД", str(e),parent=self)
             return False
 
+class ToolTip:
+    """
+    Класс для создания всплывающих подсказок для элементов виджетов.
+    """
+    def __init__(self, widget):
+        self.widget = widget
+        self.tipwindow = None
+        self.id = None
+        self.x = self.y = 0
+
+    def showtip(self, text, event=None):
+       "Отображает текст в подсказке"
+       self.text = text
+       if self.tipwindow or not self.text:
+         return
+
+       # Если координаты переданы через событие (event), используем их.
+       # Это основной способ вызова при наведении на таблицу.
+       if event is not None:
+         x = event.x_root
+         y = event.y_root
+       else:
+         # Этот блок выполнится, если метод вызван без события.
+         # Пытаемся получить координаты от виджета (для других типов виджетов).
+         # Для Treeview этот путь не будет использоваться, но оставим его для универсальности.
+         x = self.widget.winfo_rootx() + 20
+         y = self.widget.winfo_rooty() + 20
+
+       # Создаем toplevel окно для подсказки
+       self.tipwindow = tw = tk.Toplevel(self.widget)
+       tw.wm_overrideredirect(1)
+       tw.wm_geometry(f"+{x}+{y}")
+
+       label = tk.Label(tw, text=self.text, justify=tk.LEFT,
+                    background="#ffffe0", relief='solid', borderwidth=1,
+                    font=("tahoma", "8", "normal"))
+       label.pack(ipadx=1)
+
+    def hidetip(self):
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            tw.destroy()
 
 class AuthWindow(tk.Tk):
     """Окно авторизации и регистрации."""
@@ -716,6 +759,14 @@ class SearchWindow(tk.Toplevel):
         table_frame.pack(fill='both', expand=True, padx=10, pady=5)
 
         self.tree = ttk.Treeview(table_frame, columns=self.columns_db, show="headings")
+
+        # Создаем объект Tooltip (пока без текста)
+        self.tooltip = ToolTip(self.tree)
+        self.tooltip_text = "Двойной клик: открыть подробности о доноре"
+
+        # Привязываем события к дереву
+        self.tree.bind("<Motion>", self.on_tree_hover) # Отслеживаем движение мыши
+        self.tree.bind("<<TreeviewSelect>>", lambda e: self.tooltip.hidetip()) # Скрываем при клике/выделении
          
          # Настройка колонок и заголовков (используем display имена)
         for i, col_db in enumerate(self.columns_db):
@@ -736,8 +787,8 @@ class SearchWindow(tk.Toplevel):
         yscrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         xscrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscroll=yscrollbar.set, xscroll=xscrollbar.set)
-         
-         # Размещение с помощью grid для гибкости
+
+        # Размещение с помощью grid для гибкости
         self.tree.grid(row=0, column=0, columnspan=2, sticky="nsew")
         xscrollbar.grid(row=1, column=0, columnspan=2, sticky="ew")
         yscrollbar.grid(row=0, column=2, sticky="ns")
@@ -936,7 +987,9 @@ class SearchWindow(tk.Toplevel):
 
       donor_id = self.tree.item(selected_item[0])['values'][0]
       
-      AddBioWindow(donor_id)
+      add_window = AddBioWindow(donor_id)
+      add_window.parent = self  # Для обновления биоматериалов
+      #AddBioWindow(donor_id)
 
     def on_donor_double_click(self, event):
        """Открывает окно с деталями донора при двойном щелчке по строке."""
@@ -946,9 +999,14 @@ class SearchWindow(tk.Toplevel):
 
        # Получаем ID донора из первой колонки (индекс 0)
        donor_id = self.tree.item(selected_item[0])['values'][0]
-        
+
        # Открываем новое окно для редактирования
-       DonorDetailsWindow(donor_id)
+       # Передаём self (SearchWindow) как parent
+       details_window = DonorDetailsWindow(donor_id)
+       details_window.parent_search = self  # Сохраняем ссылку на окно поиска
+       
+       details_window.return_donor_id = donor_id
+       # DonorDetailsWindow(donor_id)
 
     def delete_selected_donor(self):
         """
@@ -1002,7 +1060,47 @@ class SearchWindow(tk.Toplevel):
                 messagebox.showerror("Ошибка", "Не удалось удалить данные.", parent=self)
 
         except Exception as e:
-            messagebox.showerror("Ошибка БД", str(e), parent=self)  
+            messagebox.showerror("Ошибка БД", str(e), parent=self)
+    
+    def return_focus_to_donor(self, donor_id):
+        """
+        Находит строку донора по ID и устанавливает на неё фокус.
+        """
+        # Сначала обновляем таблицу, чтобы увидеть последние изменения
+        self.perform_search()
+        
+        children = self.tree.get_children()
+        for item in children:
+            # Сравниваем ID (он в первой колонке, индекс 0)
+            current_id = self.tree.item(item)['values'][0]
+            if str(current_id) == str(donor_id):
+                # Выделяем строку и устанавливаем фокус
+                self.tree.selection_set(item)
+                self.tree.focus(item)
+                
+                # Прокручиваем таблицу так, чтобы строка была видна
+                self.tree.see(item)
+                break  
+    def on_tree_hover(self, event):
+       """
+       Обработчик движения мыши над Treeview.
+       Определяет строку и показывает/скрывает подсказку.
+       """
+       # Находим элемент (строку) под курсором
+       item_id = self.tree.identify_row(event.y)
+    
+       if item_id:
+         # Если курсор над строкой, показываем подсказку
+         self.tooltip.showtip(self.tooltip_text, event)
+        
+         # Сохраняем текущий item_id, чтобы скрыть подсказку,
+         # если мышь уйдет в область прокрутки или заголовка
+         self._current_item_id = item_id
+       else:
+         # Если курсор не над строкой (например, над заголовком или полосой прокрутки), скрываем
+         # Но скрываем только если ранее мы были над строкой, чтобы избежать мерцания
+         if hasattr(self, '_current_item_id'):
+             self.tooltip.hidetip()
 
 class AddBioWindow(tk.Toplevel):
     """Окно для добавления биоматериала к существующему донору."""
@@ -1736,6 +1834,15 @@ class DonorDetailsWindow(tk.Toplevel):
              if success:
                  messagebox.showinfo("Успех", "Биоматериал удален.",parent=self)
                  self.load_biological_materials()
+    
+    def destroy(self):
+        # Проверяем, что у нас есть родительское окно и ID для возврата
+        if hasattr(self, 'parent_search') and hasattr(self, 'return_donor_id'):
+            # Вызываем специальный метод в родителе для возврата фокуса
+            self.parent_search.return_focus_to_donor(self.return_donor_id)
+        
+        # Закрываем окно стандартным способом
+        super().destroy()
 
 if __name__ == "__main__":
     app = AuthWindow()
