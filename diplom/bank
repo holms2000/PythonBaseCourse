@@ -1,0 +1,337 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict z7yI0JZNHGIBlHVD9alKe5z8dYwUzySxJzLAK4tadc557KlCAGtxcfocAU2cu1B
+
+-- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg25.10+1)
+-- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg25.10+1)
+
+-- Started on 2026-04-10 18:14:18 MSK
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- TOC entry 224 (class 1259 OID 24948)
+-- Name: biological_materials; Type: TABLE; Schema: public; Owner: sasha
+--
+
+CREATE TABLE public.biological_materials (
+    id integer NOT NULL,
+    id_donor integer,
+    name_bio character varying(100),
+    date_i date,
+    date_end date,
+    material_type character varying(50),
+    quantity numeric(10,2),
+    unit character varying(20),
+    genetic_passport boolean
+);
+
+
+ALTER TABLE public.biological_materials OWNER TO sasha;
+
+--
+-- TOC entry 223 (class 1259 OID 24947)
+-- Name: biological_materials_id_seq; Type: SEQUENCE; Schema: public; Owner: sasha
+--
+
+CREATE SEQUENCE public.biological_materials_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.biological_materials_id_seq OWNER TO sasha;
+
+--
+-- TOC entry 3510 (class 0 OID 0)
+-- Dependencies: 223
+-- Name: biological_materials_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: sasha
+--
+
+ALTER SEQUENCE public.biological_materials_id_seq OWNED BY public.biological_materials.id;
+
+
+--
+-- TOC entry 222 (class 1259 OID 24935)
+-- Name: donors; Type: TABLE; Schema: public; Owner: sasha
+--
+
+CREATE TABLE public.donors (
+    id integer NOT NULL,
+    sex character(1),
+    birth_date date,
+    blood_group character varying(10),
+    rh_factor character(1),
+    children boolean,
+    height integer,
+    weight integer,
+    nationality character varying(50),
+    hair_color character varying(30),
+    hair_type character varying(30),
+    eye_shape character varying(30),
+    eye_color character varying(30),
+    nose_shape character varying(30),
+    face_shape character varying(30),
+    forehead_shape character varying(30),
+    body_type character varying(30),
+    clothing_size character varying(10),
+    shoe_size character varying(10),
+    education character varying(100),
+    profession character varying(100),
+    stigma boolean,
+    CONSTRAINT donors_blood_group_check CHECK (((blood_group)::text = ANY (ARRAY[('O(I)'::character varying)::text, ('A(II)'::character varying)::text, ('B(III)'::character varying)::text, ('AB(IV)'::character varying)::text]))),
+    CONSTRAINT donors_rh_factor_check CHECK ((rh_factor = ANY (ARRAY['+'::bpchar, '-'::bpchar]))),
+    CONSTRAINT donors_sex_check CHECK ((sex = ANY (ARRAY['М'::bpchar, 'Ж'::bpchar])))
+);
+
+
+ALTER TABLE public.donors OWNER TO sasha;
+
+--
+-- TOC entry 221 (class 1259 OID 24934)
+-- Name: donors_id_seq; Type: SEQUENCE; Schema: public; Owner: sasha
+--
+
+CREATE SEQUENCE public.donors_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.donors_id_seq OWNER TO sasha;
+
+--
+-- TOC entry 3511 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: donors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: sasha
+--
+
+ALTER SEQUENCE public.donors_id_seq OWNED BY public.donors.id;
+
+
+--
+-- TOC entry 220 (class 1259 OID 24923)
+-- Name: users; Type: TABLE; Schema: public; Owner: sasha
+--
+
+CREATE TABLE public.users (
+    id integer NOT NULL,
+    login character varying(50) NOT NULL,
+    passwordhash character varying(255) NOT NULL
+);
+
+
+ALTER TABLE public.users OWNER TO sasha;
+
+--
+-- TOC entry 219 (class 1259 OID 24922)
+-- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: sasha
+--
+
+CREATE SEQUENCE public.users_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.users_id_seq OWNER TO sasha;
+
+--
+-- TOC entry 3512 (class 0 OID 0)
+-- Dependencies: 219
+-- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: sasha
+--
+
+ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
+
+
+--
+-- TOC entry 3339 (class 2604 OID 24951)
+-- Name: biological_materials id; Type: DEFAULT; Schema: public; Owner: sasha
+--
+
+ALTER TABLE ONLY public.biological_materials ALTER COLUMN id SET DEFAULT nextval('public.biological_materials_id_seq'::regclass);
+
+
+--
+-- TOC entry 3338 (class 2604 OID 24938)
+-- Name: donors id; Type: DEFAULT; Schema: public; Owner: sasha
+--
+
+ALTER TABLE ONLY public.donors ALTER COLUMN id SET DEFAULT nextval('public.donors_id_seq'::regclass);
+
+
+--
+-- TOC entry 3337 (class 2604 OID 24926)
+-- Name: users id; Type: DEFAULT; Schema: public; Owner: sasha
+--
+
+ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
+
+
+--
+-- TOC entry 3504 (class 0 OID 24948)
+-- Dependencies: 224
+-- Data for Name: biological_materials; Type: TABLE DATA; Schema: public; Owner: sasha
+--
+
+COPY public.biological_materials (id, id_donor, name_bio, date_i, date_end, material_type, quantity, unit, genetic_passport) FROM stdin;
+1	14	ооцит	2000-06-06	2025-06-06		3.00	ед	f
+3	16	ооцит	2006-10-30	2028-02-02	крио	15.00	ед	t
+2	15	эмбрион	2000-01-01	2027-01-01	крио	5.00		f
+7	21	ооцит	2000-10-11	2028-01-01		12.00	ед	f
+8	22	ооцит	2025-05-05	2027-01-01	крио	15.00	ед	f
+9	13	ооцит	2025-02-02	2028-02-02	крио	15.00	ед	f
+6	17	ооцит	2025-01-03	2027-01-01	крио	15.00	ед	f
+10	20	сперма	2025-01-01	2028-01-01	крио	50.00	мл	t
+\.
+
+
+--
+-- TOC entry 3502 (class 0 OID 24935)
+-- Dependencies: 222
+-- Data for Name: donors; Type: TABLE DATA; Schema: public; Owner: sasha
+--
+
+COPY public.donors (id, sex, birth_date, blood_group, rh_factor, children, height, weight, nationality, hair_color, hair_type, eye_shape, eye_color, nose_shape, face_shape, forehead_shape, body_type, clothing_size, shoe_size, education, profession, stigma) FROM stdin;
+7	М	1977-02-03	O(I)	+	t	175	70														f
+8	М	1944-12-30	O(I)	+	t	0	0														f
+11	М	1944-05-06	A(II)	-	f	0	0														f
+12	М	1945-01-01	AB(IV)	-	f	0	0														f
+14	Ж	2006-10-30	A(II)	-	t	0	0												Среднее		f
+15	М	2006-10-30	A(II)	-	f	0	0								Широкий						f
+16	Ж	2005-04-05	B(III)	-	f	170	69					Зеленые							Высшее		f
+13	М	1955-01-01	B(III)	+	f	160	70														f
+18	М	1933-01-01	O(I)	+	f	0	0														f
+17	М	1971-01-01	AB(IV)	+	f	170	90	Русский													f
+19	М	1977-02-03	B(III)	-	f	0	0														f
+21	М	1977-02-02	AB(IV)	+	f	0	0														f
+22	Ж	1977-02-02	A(II)	+	f	0	0														f
+20	М	1977-02-03	B(III)	-	f	190	85														f
+9	М	1955-12-31	B(III)	-	t	170	95														f
+23	М	2006-01-01	A(II)	+	f	0	0														f
+\.
+
+
+--
+-- TOC entry 3500 (class 0 OID 24923)
+-- Dependencies: 220
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: sasha
+--
+
+COPY public.users (id, login, passwordhash) FROM stdin;
+1	sasha	9baed8fceea6e36d36670d72429d909547165efc038c293a14a41ef2edf83141
+2	sergei	9baed8fceea6e36d36670d72429d909547165efc038c293a14a41ef2edf83141
+3	pers	9baed8fceea6e36d36670d72429d909547165efc038c293a14a41ef2edf83141
+4	zippo	9baed8fceea6e36d36670d72429d909547165efc038c293a14a41ef2edf83141
+6	persik	9baed8fceea6e36d36670d72429d909547165efc038c293a14a41ef2edf83141
+7	mamps	9baed8fceea6e36d36670d72429d909547165efc038c293a14a41ef2edf83141
+10	persik1	9baed8fceea6e36d36670d72429d909547165efc038c293a14a41ef2edf83141
+\.
+
+
+--
+-- TOC entry 3513 (class 0 OID 0)
+-- Dependencies: 223
+-- Name: biological_materials_id_seq; Type: SEQUENCE SET; Schema: public; Owner: sasha
+--
+
+SELECT pg_catalog.setval('public.biological_materials_id_seq', 10, true);
+
+
+--
+-- TOC entry 3514 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: donors_id_seq; Type: SEQUENCE SET; Schema: public; Owner: sasha
+--
+
+SELECT pg_catalog.setval('public.donors_id_seq', 23, true);
+
+
+--
+-- TOC entry 3515 (class 0 OID 0)
+-- Dependencies: 219
+-- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: sasha
+--
+
+SELECT pg_catalog.setval('public.users_id_seq', 10, true);
+
+
+--
+-- TOC entry 3350 (class 2606 OID 24954)
+-- Name: biological_materials biological_materials_pkey; Type: CONSTRAINT; Schema: public; Owner: sasha
+--
+
+ALTER TABLE ONLY public.biological_materials
+    ADD CONSTRAINT biological_materials_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 3348 (class 2606 OID 24946)
+-- Name: donors donors_pkey; Type: CONSTRAINT; Schema: public; Owner: sasha
+--
+
+ALTER TABLE ONLY public.donors
+    ADD CONSTRAINT donors_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 3344 (class 2606 OID 24933)
+-- Name: users users_login_key; Type: CONSTRAINT; Schema: public; Owner: sasha
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_login_key UNIQUE (login);
+
+
+--
+-- TOC entry 3346 (class 2606 OID 24931)
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: sasha
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 3351 (class 2606 OID 24955)
+-- Name: biological_materials biological_materials_id_donor_fkey; Type: FK CONSTRAINT; Schema: public; Owner: sasha
+--
+
+ALTER TABLE ONLY public.biological_materials
+    ADD CONSTRAINT biological_materials_id_donor_fkey FOREIGN KEY (id_donor) REFERENCES public.donors(id) ON DELETE CASCADE;
+
+
+-- Completed on 2026-04-10 18:14:18 MSK
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict z7yI0JZNHGIBlHVD9alKe5z8dYwUzySxJzLAK4tadc557KlCAGtxcfocAU2cu1B
+
