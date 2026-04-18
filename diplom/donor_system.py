@@ -6,6 +6,8 @@ from contextlib import closing
 import os
 from dotenv import load_dotenv
 import sys
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # --- НАСТРОЙКИ ПОДКЛЮЧЕНИЯ К БД ---
 env_path = os.path.join(sys.path[0], '.env.example')
@@ -301,22 +303,61 @@ class RegisterWindow(tk.Toplevel):
 
 
 class MainMenu(tk.Tk):
-    """Главное меню после авторизации."""
+    """Главное меню после авторизации с обновленным интерфейсом."""
     def __init__(self, user_id, user_login):
         super().__init__()
         self.user_id = user_id
         self.user_login = user_login
         
+        # Увеличенный размер окна
+        self.geometry("600x300") 
         self.title(f"Главное меню | Пользователь: {user_login}")
-        self.geometry("400x200")
-        
-        # Создаем фрейм для кнопок и размещаем его по центру с помощью grid + sticky
-        btn_frame = tk.Frame(self)
-        btn_frame.pack(expand=True)
-         
-        ttk.Button(btn_frame, text="Добавить донора и биоматериал", command=lambda: self.open_add_donor()).grid(row=0, column=0, padx=50, pady=20)
-        ttk.Button(btn_frame, text="Поиск доноров / биоматериалов", command=lambda: self.open_search()).grid(row=1, column=0, padx=50, pady=20)
+        self.resizable(True, True)
 
+        # Основной контейнер (Frame), который будет заполнять всё окно
+        main_container = tk.Frame(self)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # --- Левая часть: Кнопки ---
+        button_frame = tk.Frame(main_container)
+        button_frame.pack(side=tk.LEFT, fill=tk.Y)
+
+        # Используем более крупные кнопки с отступами
+        ttk.Button(button_frame, 
+                  text="➕ Добавить донора и биоматериал", 
+                  command=self.open_add_donor,
+                  style='Large.TButton').pack(pady=15, ipadx=10, ipady=5)
+        
+        ttk.Button(button_frame,
+                  text="🔎 Поиск доноров / биоматериалов",
+                  command=self.open_search,
+                  style='Large.TButton').pack(pady=15, ipadx=10, ipady=5)
+        
+        # Добавляем стиль для кнопок (можно вынести в начало файла)
+        style = ttk.Style()
+        style.configure('Large.TButton', font=('Helvetica', 12))
+
+        # --- Правая часть: Картинка ---
+        # Оборачиваем Label в Frame, чтобы он не сжимал картинку
+        image_frame = tk.Frame(main_container, bg='lightgrey')
+        image_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        
+        try:
+            # Путь к картинке должен быть правильным относительно запускаемого файла
+            self.logo_img = tk.PhotoImage(file="logo_donors.png") # Замените на ваш файл
+            # Label для картинки. Указываем bg, чтобы фон был виден при сжатии окна
+            logo_label = tk.Label(image_frame, image=self.logo_img, bg='lightgrey')
+            logo_label.pack(expand=True) # expand=True позволит картинке занять всё место
+            
+            # Чтобы картинка меняла размер вместе с окном
+            image_frame.bind("<Configure>", lambda e: logo_label.config(width=e.width, height=e.height))
+            
+        except tk.TclError as e:
+            # Если картинка не найдена, выводим текст
+            error_label = tk.Label(image_frame, 
+                                  text="Картинка не загружена.\nПроверьте путь к файлу.",
+                                  fg="red", bg='lightgrey', font=('Helvetica', 14))
+            error_label.pack(expand=True)
 
     def open_add_donor(self):
          AddDonorWindow()
@@ -798,7 +839,12 @@ class SearchWindow(tk.Toplevel):
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=5)
-        
+        # Новая кнопка для отображения графика
+        ttk.Button(btn_frame,
+           text="График доноров (Возраст/Пол)",
+           command=self.show_donors_chart).pack(side='left', padx=5)
+
+
         ttk.Button(btn_frame,
                    text="Удалить выбранного донора",
                    command=self.delete_selected_donor).pack(side='left', padx=5)
@@ -1101,6 +1147,86 @@ class SearchWindow(tk.Toplevel):
          # Но скрываем только если ранее мы были над строкой, чтобы избежать мерцания
          if hasattr(self, '_current_item_id'):
              self.tooltip.hidetip()
+    
+    def show_donors_chart(self):
+        """Открывает новое окно с графиком распределения доноров по возрасту и полу."""
+        chart_window = tk.Toplevel(self)
+        chart_window.title("Статистика доноров: Возраст и Пол")
+        chart_window.geometry("700x500")
+        
+        # Сообщение о загрузке, пока строится график
+        loading_label = tk.Label(chart_window, text="Загрузка данных и построение графика...", font=('Arial', 12))
+        loading_label.pack(pady=20)
+        
+        # Запрашиваем данные из БД в отдельном потоке или после (чтобы окно успело отрисоваться)
+        chart_window.after(100, self._build_and_show_chart, chart_window, loading_label)
+
+    def _build_and_show_chart(self, parent_window, loading_label):
+        """Внутренний метод для извлечения данных и отрисовки графика."""
+        db = DatabaseConnection(DB_CONFIG)
+        
+        # SQL-запрос для получения возраста и пола всех доноров.
+        # Используем функцию age() или расчет через birth_date в зависимости от вашей СУБД.
+        # Пример для PostgreSQL:
+        query = """
+            SELECT 
+                sex, 
+                date_part('year', age(birth_date)) AS age_years 
+            FROM donors;
+        """
+        
+        try:
+            result = db.execute_query(query)
+            
+            if not result:
+                messagebox.showinfo("Информация", "Нет данных для построения графика.", parent=parent_window)
+                parent_window.destroy()
+                return
+
+            # Очистка окна от сообщения о загрузке
+            loading_label.destroy()
+            
+            # Подготовка данных для графика
+            male_ages = []
+            female_ages = []
+            
+            for row in result:
+                sex, age = row
+                if age is None: # Пропускаем пустые значения возраста
+                    continue
+                if sex == 'М':
+                    male_ages.append(age)
+                elif sex == 'Ж':
+                    female_ages.append(age)
+            
+            # Создание фигуры и осей для графика
+            fig, ax = plt.subplots(figsize=(7, 4), dpi=100)
+            
+            # Строим гистограмму. Задаем прозрачность (alpha) и количество бинов (групп по возрасту).
+            ax.hist([male_ages, female_ages], 
+                    bins=range(0, 101, 5),  # Группы по 5 лет от 0 до 100
+                    label=['Мужчины', 'Женщины'], 
+                    color=['#377eb8', '#e41a1c'], 
+                    alpha=0.75)
+            
+            ax.set_title("Распределение доноров по возрасту и полу")
+            ax.set_xlabel("Возраст (лет)")
+            ax.set_ylabel("Количество доноров")
+            ax.legend(loc='upper right')
+            ax.grid(True, linestyle='--', alpha=0.5)
+            
+            # Встраиваем график в окно Tkinter
+            canvas = FigureCanvasTkAgg(fig, master=parent_window)
+            canvas.draw()
+            canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+            
+            # Добавляем кнопку закрытия окна прямо под графиком
+            btn_close = ttk.Button(parent_window, text="Закрыть", command=parent_window.destroy)
+            btn_close.pack(pady=10)
+
+        except Exception as e:
+            loading_label.destroy()
+            messagebox.showerror("Ошибка", f"Не удалось построить график: {e}", parent=parent_window)
 
 class AddBioWindow(tk.Toplevel):
     """Окно для добавления биоматериала к существующему донору."""
